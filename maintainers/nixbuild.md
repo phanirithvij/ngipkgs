@@ -73,7 +73,7 @@ usually exactly the contents of the file
 
     ~/.ssh/id_ed25519.pub
 
-Navigate to <https://nixbuild.net/register>, enter your e-mail
+Navigate to <https://nixbuild.net/#register>, enter your e-mail
 address and public key.
 
 Confirm your e-mail address (check your inbox).
