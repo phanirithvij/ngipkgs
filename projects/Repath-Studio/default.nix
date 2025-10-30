@@ -20,7 +20,7 @@
       };
       docs = {
         text = "Documentation";
-        url = "https://repath.studio/get-started/build-from-source/";
+        url = "https://repath.studio/get-started/download/";
       };
       blog = {
         text = "Blog";
