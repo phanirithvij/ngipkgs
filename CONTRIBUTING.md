@@ -64,7 +64,7 @@ Instead, write one sentence per line, as this makes it easier to review changes.
      nix fmt pkgs/by-name/some-package
      ```
 
-   An existing example is [libgnunetchat](https://github.com/ngi-nix/ngipkgs/blob/main/pkgs/by-name/libgnunetchat/package.nix).
+   An existing example is [wireguard-rs](https://github.com/ngi-nix/ngipkgs/blob/main/pkgs/by-name/wireguard-rs/package.nix).
 
 1. When contributing to a project, start by checking if it has an entry in `projects/some-project`.
    If the entry does not exist, copy the project template and edit it with relevant details:
