@@ -43,8 +43,6 @@ let
   ];
 
   frontend = callPackage ./frontend.nix { };
-
-  pythonPath = python.pkgs.makePythonPath pythonPackages;
 in
 
 python.pkgs.buildPythonApplication rec {
@@ -124,6 +122,9 @@ python.pkgs.buildPythonApplication rec {
     mkdir -p $out/bin
     pdfdingDir=$out/${python.sitePackages}/pdfding
     pythonPath=${python.pkgs.makePythonPath dependencies}
+
+    # make an empty dir to supress the warning
+    mkdir -p $pdfdingDir/static
 
     makeWrapper "$pdfdingDir/manage.py" $out/bin/pdfding-manage \
       --set-default DATA_DIR "/var/lib/pdfding" \
