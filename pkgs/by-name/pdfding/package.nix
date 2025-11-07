@@ -6,35 +6,10 @@
   fetchpatch2,
   makeWrapper,
 }:
-/*
-  - pretalx seems to be a django application in ngipkgs
-  - paperless-ngx
-  - glitchtip
-  - package
-    - [x] frontend
-    - [x] django manage.py cli wrapper
-    - [x] pytest tests
-    - [x] server (gunicorn)
-    - [ ] updateScript
-  - [ ] nixos module
-    - [x] BASE_DIR needs to be patched likely for /var/lib/pdfding/{media,db}
-  - [ ] nixos tests
-    - [ ] pytest e2e tests, playwright
-      - [ ] versioncheckhook not possible to add because no cli
-        - [ ] do some curl version check
-    - [ ] sqlite (no huey, no pgsql)
-    - [ ] default (pgsql, consume+huey yes)
-    - [ ] backups (pgsql, bkp+huey+redis yes)
-  - [ ] examples
-    - [ ] copy from nixos tests the configs for basic (sqlite), default (posgtgres), full (pg, minio, no-redis huey)
-  - [ ] demo vm
-    - [ ] 3 vms sqlite, default, full, same as above?
-*/
 let
   python = python3.override {
     self = python;
     packageOverrides = final: prev: {
-      # TODO figure out exact versions for other deps from upstream's poetry lock
       django = prev.django_5_2;
     };
   };
@@ -88,10 +63,10 @@ python.pkgs.buildPythonPackage rec {
   pyproject = true;
 
   patches = [
-    # remove both patches in 1.4.2 (next version after 1.4.1)
+    # remove all patches in 1.4.2 (next version after 1.4.1)
     # patch to add data_dir
     (fetchpatch2 {
-      url = "https://github.com/mrmn2/PdfDing/commit/387ca2079f74844203e2e91fac00e0d0e0e5fdb9.patch?full_index=1";
+      url = "https://github.com/mrmn2/PdfDing/commit/f4945f2836ca8d972fcee2f00ef1d9cf217bada1.patch?full_index=1";
       hash = "sha256-VGjyIAVi+qd2WZ8FVKKC2ijLinoflO7RmPwIW1/oGcY=";
     })
     # pyproject.toml still has 0.1.1 very old version
@@ -99,10 +74,9 @@ python.pkgs.buildPythonPackage rec {
       url = "https://github.com/mrmn2/PdfDing/pull/203.patch?full_index=1";
       hash = "sha256-lKtpqKdyoGZdU4fTegto+YUIduIWbM82RQU9459NpC0=";
     })
-    # allow cusomising consume crontab
-    # follow https://github.com/mrmn2/PdfDing/pull/205
+    # allows customising consume_schedule crontab
     (fetchpatch2 {
-      url = "https://github.com/mrmn2/PdfDing/commit/091dd44ae49dcc73573ce318e9ee35b8218deb6f.patch?full_index=1";
+      url = "https://github.com/mrmn2/PdfDing/commit/96a13574718e0d27240eee8893fb799a02f24c05.patch?full_index=1";
       hash = "sha256-Stq392rIbsphvaE23GgFWb91KzpD6aOQu9MGDDoaO7s=";
     })
   ];
@@ -160,23 +134,46 @@ python.pkgs.buildPythonPackage rec {
       --add-flags '--bind ''${HOST_IP:-127.0.0.1}:''${HOST_PORT:-8080} core.wsgi:application'
   '';
 
-  # TODO too many mismatched deps from project's requirements, and no better solution
-  # if some dep doesn't work it needs to be manually overriden via python3.override, packageOverrides
-  # Or poetry2nix (remember it being abandoned) maybe magic2nix which ngipkgs already seems to import
-  # the focus is to make it work in nixpkgs, ie. no 2nix, and 2nix as a last resort
   pythonRelaxDeps = true;
+
+  nativeCheckInputs = with python.pkgs; [
+    pytest-cov-stub
+    pytest-django
+    pytestCheckHook
+  ];
+
+  # from .github/workflows/tests.yaml
+  pytestFlags = [
+    "--ignore=e2e"
+    "--cov=admin"
+    "--cov=backup"
+    "--cov=base"
+    "--cov=pdf"
+    "--cov=users"
+    "--cov-fail-under=100"
+  ];
+
   /*
-    pythonRelaxDeps = [
-      "django"
-      "django-allauth"
-      "django-htmx"
-      "minio"
-      "nh3"
-      "pypdf"
-      "pypdfium2"
-      "ruamel-yaml"
-    ];
+    fix two breaking tests by providing full out path
+    AssertionError: Calls not found
+    AssertionError: 'add_file_to_minio' does not contain all of ...
   */
+  preCheck = ''
+    # dev.py is required for tests, restore it
+    mv dev.py.bak $out/${python.sitePackages}/pdfding/core/settings/dev.py
+
+    pushd pdfding || exit 1
+
+    substituteInPlace backup/tests/test_management.py backup/tests/test_tasks.py \
+      --replace-fail "Path(__file__).parents[2]" "Path('$out/${python.sitePackages}/pdfding')"
+  '';
+
+  postCheck = ''
+    popd || exit 1
+
+    # remove dev.py
+    rm $out/${python.sitePackages}/pdfding/core/settings/dev.py
+  '';
 
   pythonImportsCheck = [
     "pdfding"
