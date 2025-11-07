@@ -39,7 +39,7 @@ let
     };
   };
 
-  pythonPackages = with python.pkgs; [
+  dependencies = with python.pkgs; [
     django
     django-allauth
     django-cleanup
@@ -68,8 +68,6 @@ let
   ];
 
   frontend = callPackage ./frontend.nix { };
-
-  pythonPath = python.pkgs.makePythonPath pythonPackages;
 in
 
 python.pkgs.buildPythonApplication rec {
@@ -96,7 +94,7 @@ python.pkgs.buildPythonApplication rec {
     ./add-version.patch
   ];
 
-  dependencies = pythonPackages;
+  inherit dependencies;
 
   build-system = with python.pkgs; [ poetry-core ];
 
@@ -138,20 +136,21 @@ python.pkgs.buildPythonApplication rec {
   '';
 
   postInstall = ''
-    mkdir -p $out/{bin,share}
+    mkdir -p $out/bin
     pdfdingDir=$out/${python.sitePackages}/pdfding
+    pythonPath=${python.pkgs.makePythonPath dependencies}
 
     # make an empty dir to supress the warning
     mkdir -p $pdfdingDir/static
 
     makeWrapper "$pdfdingDir/manage.py" $out/bin/pdfding-manage \
       --set-default DATA_DIR "/var/lib/pdfding" \
-      --prefix PYTHONPATH : "${pythonPath}"
+      --prefix PYTHONPATH : "$pythonPath"
 
     makeWrapper ${lib.getExe python.pkgs.gunicorn} $out/bin/pdfding-start \
       --set-default DATA_DIR "/var/lib/pdfding" \
-      --prefix PYTHONPATH : "${pythonPath}:$pdfdingDir" \
-      --add-flags '--bind $HOST_IP:$HOST_PORT core.wsgi:application'
+      --prefix PYTHONPATH : "$pythonPath:$pdfdingDir" \
+      --add-flags '--bind ''${HOST_IP:-127.0.0.1}:''${HOST_PORT:-8080} core.wsgi:application'
   '';
 
   # TODO too many mismatched deps from project's requirements, and no better solution
@@ -231,8 +230,8 @@ python.pkgs.buildPythonApplication rec {
   meta = {
     description = "Selfhosted PDF manager, viewer and editor offering a seamless user experience on multiple devices";
     homepage = "https://github.com/mrmn2/PdfDing";
-    changelog = "https://github.com/mrmn2/PdfDing/blob/${src.tag}/CHANGELOG.md";
-    license = lib.licenses.agpl3Plus;
+    changelog = "https://github.com/mrmn2/PdfDing/blob/${src.rev}/CHANGELOG.md";
+    license = lib.licenses.agpl3Only;
     maintainers = with lib.maintainers; [ phanirithvij ];
     teams = with lib.teams; [ ngi ];
     mainProgram = "pdfding-manage";
