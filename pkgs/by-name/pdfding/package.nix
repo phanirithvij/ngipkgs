@@ -95,9 +95,6 @@ python.pkgs.buildPythonApplication rec {
 
     ${python.pythonOnBuildForHost.interpreter} pdfding/manage.py collectstatic
 
-    # dev.py is required so that test will run properly, restore it
-    mv pdfding/core/settings/dev.py.bak pdfding/core/settings/dev.py
-
     # not needed, now we have staticfiles directory
     rm -rf pdfding/static
 
@@ -122,9 +119,6 @@ python.pkgs.buildPythonApplication rec {
     mkdir -p $out/bin
     pdfdingDir=$out/${python.sitePackages}/pdfding
     pythonPath=${python.pkgs.makePythonPath dependencies}
-
-    # make an empty dir to supress the warning
-    mkdir -p $pdfdingDir/static
 
     makeWrapper "$pdfdingDir/manage.py" $out/bin/pdfding-manage \
       --set-default DATA_DIR "/var/lib/pdfding" \
@@ -204,21 +198,18 @@ python.pkgs.buildPythonApplication rec {
   */
   preCheck = ''
     pushd pdfding || exit 1
+
+    # dev.py is required for tests, restore it
+    cp $src/pdfding/core/settings/dev.py $out/${python.sitePackages}/pdfding/core/settings/dev.py
+
     substituteInPlace backup/tests/test_management.py backup/tests/test_tasks.py \
       --replace-fail "Path(__file__).parents[2]" "Path('$out/${python.sitePackages}/pdfding')"
   '';
 
   postCheck = ''
     popd || exit 1
-  '';
 
-  # dev.py is required for tests and MUST be removed from the final output
-  # this could be done in postCheck, but doing it here will allow doCheck to be toggleable
-  postPhases = [ "finalPhase" ];
-
-  finalPhase = ''
-    # dev.py should be removed on production build (source Dockerfile)
-    # can't be removed earlier, required for checkPhase
+    # remove dev.py
     rm $out/${python.sitePackages}/pdfding/core/settings/dev.py
   '';
 
