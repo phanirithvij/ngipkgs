@@ -77,21 +77,24 @@ python.pkgs.buildPythonApplication rec {
     owner = "mrmn2";
     repo = "PdfDing";
     tag = "v${version}";
-    hash = "sha256-8e80gMdB6U3977dIU7bIAAEguYmi+AWQgUgYPDLCYLI=";
+    hash = "sha256-rrUaqxDO16NAOic74jeYgN+7Alvo+fIIacJdSOg0hFM=";
+    # remove in 1.4.2
+    postFetch = "mv $out/{license.txt,LICENSE}";
   };
   pyproject = true;
 
   patches = [
-    # remove in 1.4.2 (next version after 1.4.1)
+    # remove both patches in 1.4.2 (next version after 1.4.1)
     # patch to add data_dir
-    # https://github.com/mrmn2/PdfDing/pull/202
     (fetchpatch2 {
       url = "https://github.com/mrmn2/PdfDing/commit/387ca2079f74844203e2e91fac00e0d0e0e5fdb9.patch?full_index=1";
       hash = "sha256-VGjyIAVi+qd2WZ8FVKKC2ijLinoflO7RmPwIW1/oGcY=";
     })
     # pyproject.toml still has 0.1.1 very old version
-    # follow https://github.com/mrmn2/PdfDing/pull/203
-    ./add-version.patch
+    (fetchpatch2 {
+      url = "https://github.com/mrmn2/PdfDing/pull/203.patch?full_index=1";
+      hash = "sha256-lKtpqKdyoGZdU4fTegto+YUIduIWbM82RQU9459NpC0=";
+    })
   ];
 
   inherit dependencies;
@@ -107,13 +110,10 @@ python.pkgs.buildPythonApplication rec {
     rm -rf pdfding/static
     ln -s ${passthru.frontend}/pdfding/static pdfding/static
 
-    # not generating staticfiles.json if it exists
-    mv pdfding/core/settings/dev.py pdfding/core/settings/dev.py.bak
+    # staticfiles step requires prod configuration, remove dev.py
+    rm pdfding/core/settings/dev.py
 
     ${python.pythonOnBuildForHost.interpreter} pdfding/manage.py collectstatic
-
-    # dev.py is required so that test will run properly, restore it
-    mv pdfding/core/settings/dev.py.bak pdfding/core/settings/dev.py
 
     # not needed, now we have staticfiles directory
     rm -rf pdfding/static
@@ -139,9 +139,6 @@ python.pkgs.buildPythonApplication rec {
     mkdir -p $out/bin
     pdfdingDir=$out/${python.sitePackages}/pdfding
     pythonPath=${python.pkgs.makePythonPath dependencies}
-
-    # make an empty dir to supress the warning
-    mkdir -p $pdfdingDir/static
 
     makeWrapper "$pdfdingDir/manage.py" $out/bin/pdfding-manage \
       --set-default DATA_DIR "/var/lib/pdfding" \
@@ -198,21 +195,18 @@ python.pkgs.buildPythonApplication rec {
   */
   preCheck = ''
     pushd pdfding || exit 1
+
+    # dev.py is required for tests, restore it
+    cp $src/pdfding/core/settings/dev.py $out/${python.sitePackages}/pdfding/core/settings/dev.py
+
     substituteInPlace backup/tests/test_management.py backup/tests/test_tasks.py \
       --replace-fail "Path(__file__).parents[2]" "Path('$out/${python.sitePackages}/pdfding')"
   '';
 
   postCheck = ''
     popd || exit 1
-  '';
 
-  # dev.py is required for tests and MUST be removed from the final output
-  # this could be done in postCheck, but doing it here will allow doCheck to be toggleable
-  postPhases = [ "finalPhase" ];
-
-  finalPhase = ''
-    # dev.py should be removed on production build (source Dockerfile)
-    # can't be removed earlier, required for checkPhase
+    # remove dev.py
     rm $out/${python.sitePackages}/pdfding/core/settings/dev.py
   '';
 
@@ -224,7 +218,7 @@ python.pkgs.buildPythonApplication rec {
 
   passthru = {
     updateScript = ./update.sh;
-    inherit frontend;
+    inherit frontend python;
   };
 
   meta = {

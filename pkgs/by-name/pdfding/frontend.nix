@@ -2,6 +2,7 @@
   stdenv,
   nodejs,
   npmHooks,
+  fetchpatch2,
   fetchNpmDeps,
   fetchzip,
   fetchFromGitHub,
@@ -24,7 +25,12 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   patches = [
-    ./add-version.patch
+    # remove patch in 1.4.2
+    # package.json has missing version and name
+    (fetchpatch2 {
+      url = "https://github.com/mrmn2/PdfDing/pull/203.patch?full_index=1";
+      hash = "sha256-lKtpqKdyoGZdU4fTegto+YUIduIWbM82RQU9459NpC0=";
+    })
   ];
 
   passthru = {
