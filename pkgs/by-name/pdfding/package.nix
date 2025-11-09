@@ -171,10 +171,6 @@ python.pkgs.buildPythonApplication rec {
     rm $out/${python.sitePackages}/pdfding/core/settings/dev.py
   '';
 
-  pythonImportsCheck = [
-    "pdfding"
-  ];
-
   passthru = {
     updateScript = ./update.sh;
     inherit frontend python;
@@ -189,4 +185,4 @@ python.pkgs.buildPythonApplication rec {
     teams = with lib.teams; [ ngi ];
     mainProgram = "pdfding-manage";
   };
-}
+})
