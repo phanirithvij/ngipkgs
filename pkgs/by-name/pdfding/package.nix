@@ -1,6 +1,6 @@
 {
   lib,
-  stdenv,
+  #stdenv,
   python313,
   callPackage,
   fetchFromGitHub,
@@ -12,10 +12,14 @@
   - glitchtip
   - package
     - [x] frontend
-    - [ ] server
-    - [ ] django manage cli wrapper
+    - [x] django manage.py cli wrapper
+    - [ ] pytest tests
+    - [ ] server (the nixos module?)
+    - [ ] versioncheckhook not possible to add because no cli
   - [ ] nixos module
-  - [ ] nixos test
+    - BASE_DIR needs to be patched likely for /var/lib/pdfding/{media,db}
+  - [ ] nixos tests
+    - [ ] e2e
   - [ ] example
 */
 let
@@ -23,7 +27,7 @@ let
   python = python3.override {
     self = python;
     packageOverrides = final: prev: {
-      # TODO figure out exact versions from upstream's docker runtime or poetry lock
+      # TODO figure out exact versions for other deps from upstream's poetry lock
       django = prev.django_5_2;
     };
   };
@@ -54,40 +58,52 @@ let
     huey # TODO what's run_huey in django
     supervisor # TODO what about this? does it work with systemd service?
 
-    poetry-core
+    # poetry-core # TODO remove if not using mkdrv
   ];
 
   frontend = callPackage ./frontend.nix { };
+
+  pythonPath = python.pkgs.makePythonPath pythonPackages;
 in
-stdenv.mkDerivation (finalAttrs: {
+
+# TODO likely buildPythonApplication so that all python phases work properly
+# TODO maybe a buildPythonPackage can help with the test failures
+# idk how to make all of them work in std.mkdrv
+python.pkgs.buildPythonApplication rec {
+  # stdenv.mkDerivation (finalAttrs: {
   pname = "pdfding";
-  version = "1.3.3";
+
+  # TODO pyproject.toml still has 0.1.1 very old version, pr a fix upstream or patch?
+  #version = "1.3.3";
+  version = "1.4.0";
   src = fetchFromGitHub {
     owner = "mrmn2";
     repo = "PdfDing";
-    tag = "v${finalAttrs.version}";
-    hash = "sha256-TRQQdZa4X+Kx13QCYChqkN4eT5VJjAti+DR+MqOPsOU=";
+    #tag = "v${finalAttrs.version}"; #mkdrv
+    tag = "v${version}";
+    #hash = "sha256-TRQQdZa4X+Kx13QCYChqkN4eT5VJjAti+DR+MqOPsOU="; # v1.3.3
+    hash = "sha256-G2Dzszuau3Z//0ClOJLeuatLZSJBj1uTBJfWt0/x3to="; # v1.4.0
   };
   pyproject = true;
 
-  propagatedBuildInputs = pythonPackages;
+  # propagatedBuildInputs = pythonPackages; #mkdrv
+  dependencies = pythonPackages;
+
+  build-system = with python.pkgs; [ poetry-core ];
 
   nativeBuildInputs = [
-    python
+    # python # TODO remove if not using mkdrv
     makeWrapper
   ];
 
-  buildPhase = ''
-    runHook preBuild
-
-    # prod build, as per dockerfile
-    rm pdfding/core/settings/dev.py
-
+  #ln -s ${finalAttrs.passthru.frontend}/pdfding/static pdfding/static
+  preBuild = ''
     # remove originals, copy from frontend
     rm -rf pdfding/static
-    ln -s ${finalAttrs.passthru.frontend}/pdfding/static pdfding/static
+    ln -s ${passthru.frontend}/pdfding/static pdfding/static
 
-    ${python.pythonOnBuildForHost.interpreter} pdfding/manage.py collectstatic
+    # TODO slow step, disabling temporarily for quick iterations
+    # ${python.pythonOnBuildForHost.interpreter} pdfding/manage.py collectstatic
 
     # not needed, now we have staticfiles directory
     rm -rf pdfding/static
@@ -106,25 +122,25 @@ stdenv.mkDerivation (finalAttrs: {
            done \
         && echo 'Successfully removed hash from pdfjs files'
 
-    echo "VERSION = '${finalAttrs.version}'" > pdfding/core/settings/version.py;
-
-    runHook postBuild
+    echo "VERSION = '${version}'" > pdfding/core/settings/version.py;
   '';
+  #echo "VERSION = '${finalAttrs.version}'" > pdfding/core/settings/version.py;
 
-  installPhase = ''
-    runHook preInstall
+  postInstall = ''
+    mkdir -p $out/bin
 
-    mkdir -p $out/lib
-    cp -r . $out/lib
-    makeWrapper $out/lib/pdfding/manage.py $out/bin/pdfding-manage \
+    # prod build, as per dockerfile
+    rm pdfding/core/settings/dev.py
+
+    makeWrapper "$out/${python.sitePackages}/pdfding/manage.py" $out/bin/pdfding-manage \
       --prefix PYTHONPATH : "$PYTHONPATH"
-
-    runHook postInstall
   '';
 
   # TODO too many mismatched deps from project's requirements, and no better solution
   # if some dep doesn't work it needs to be manually overriden via python3.override, packageOverrides
-  # pythonRelaxDeps = true;
+  # Or poetry2nix (remember it being abandoned) maybe magic2nix which ngipkgs already seems to import
+  # focus is to make it work in nixpkgs, ie. no 2nix. and 2nix as a last resort
+  pythonRelaxDeps = true;
   /*
     pythonRelaxDeps = [
       "django"
@@ -138,6 +154,52 @@ stdenv.mkDerivation (finalAttrs: {
     ];
   */
 
+  # TODO these are showing up in pdfding-manage PYTHONPATH (when doing interactive develop build)
+  # doCheck false does remove them, maybe it does work if tests succeed
+  nativeCheckInputs = with python.pkgs; [
+    pillow
+    pytest-cov-stub
+    pytest-django
+    pytestCheckHook
+    # pythonImportsCheckHook #mkdrv
+  ];
+
+  #TODO disable this for quick iteration as well
+  #doCheck = false;
+
+  # from .github/workflows/tests.yaml
+  pytestFlags = [
+    "--ignore=e2e"
+    "--cov=admin"
+    "--cov=backup"
+    "--cov=base"
+    "--cov=pdf"
+    "--cov=users"
+    "--cov-fail-under=100"
+  ];
+
+  /*
+     fix two breaking tests by providing full out path
+     AssertionError: Calls not found
+     AssertionError: 'add_file_to_minio' does not contain all of ...
+  */
+  preCheck = ''
+    pushd pdfding || exit 1
+
+    substituteInPlace backup/tests/test_management.py backup/tests/test_tasks.py \
+      --replace-fail "Path(__file__).parents[2]" "Path('$out/${python.sitePackages}/pdfding')"
+  '';
+
+  postCheck = ''
+    popd || exit 1
+  '';
+
+  # enabledTestPaths = [ "backup/" ]; # TODO remove once fixed/disabled, added for quick iteration
+
+  pythonImportsCheck = [
+    "pdfding"
+  ];
+
   passthru = {
     updateScript = ""; # TODO custom update script maybe, for handling npmDeps hash
     inherit frontend; # would allow easily overriding it
@@ -146,10 +208,12 @@ stdenv.mkDerivation (finalAttrs: {
   meta = {
     description = "Selfhosted PDF manager, viewer and editor offering a seamless user experience on multiple devices";
     homepage = "https://github.com/mrmn2/PdfDing";
-    changelog = "https://github.com/mrmn2/PdfDing/blob/${finalAttrs.src.tag}/CHANGELOG.md";
-    license = lib.licenses.agpl3Only;
+    changelog = "https://github.com/mrmn2/PdfDing/blob/${src.tag}/CHANGELOG.md";
+    #changelog = "https://github.com/mrmn2/PdfDing/blob/${finalAttrs.src.tag}/CHANGELOG.md";
+    license = lib.licenses.agpl3Only; # TODO is it agpl3Plus
     maintainers = with lib.maintainers; [ phanirithvij ];
     teams = with lib.teams; [ ngi ];
     mainProgram = "pdfding-manage";
   };
-})
+}
+#})

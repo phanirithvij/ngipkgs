@@ -12,18 +12,21 @@
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname = "pdfding-frontend";
-  version = "1.3.3";
+  #version = "1.3.3";
+  version = "1.4.0";
   src = fetchFromGitHub {
     owner = "mrmn2";
     repo = "PdfDing";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-TRQQdZa4X+Kx13QCYChqkN4eT5VJjAti+DR+MqOPsOU=";
+    #hash = "sha256-TRQQdZa4X+Kx13QCYChqkN4eT5VJjAti+DR+MqOPsOU="; # v1.3.3
+    hash = "sha256-G2Dzszuau3Z//0ClOJLeuatLZSJBj1uTBJfWt0/x3to="; # v1.4.0
   };
 
   npmDeps = fetchNpmDeps {
     inherit (finalAttrs) src;
     name = "pdfding-frontend-${finalAttrs.version}-npm-deps";
-    hash = "sha256-m9zr6+3LHG40dDFfTBXwqHCJVyTGuurNJq7xRrosFlA=";
+    #hash = "sha256-m9zr6+3LHG40dDFfTBXwqHCJVyTGuurNJq7xRrosFlA="; # v1.3.3
+    hash = "sha256-v1NFqDnFcRK8sd0bV3ck+LLMYQ90Dl1R1OnBTwWUVUg="; # v1.4.0
   };
 
   # npm error Invalid package, must have name and version
@@ -37,11 +40,13 @@ stdenv.mkDerivation (finalAttrs: {
     let
       # version from pdfding dockerfile
       # TODO handle in updateScript
-      pdfjsVersion = "5.4.149";
+      #pdfjsVersion = "5.4.149";
+      pdfjsVersion = "5.4.296";
     in
     fetchzip {
       url = "https://github.com/mozilla/pdf.js/releases/download/v${pdfjsVersion}/pdfjs-${pdfjsVersion}-dist.zip";
-      hash = "sha256-f/wdLva8bsMwcETlT1LiFblbOXbDAOFOiPvpJ6Ziysk=";
+      #hash = "sha256-f/wdLva8bsMwcETlT1LiFblbOXbDAOFOiPvpJ6Ziysk="; # v1.3.3
+      hash = "sha256-UQ7sYOh7s95mfzH2ZbfDyEvUZiXr7MI3u0WY8WNHWv4="; # v1.4.0
       stripRoot = false;
     };
 
