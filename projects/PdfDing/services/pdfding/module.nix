@@ -15,7 +15,7 @@ in
     package = lib.mkPackageOption pkgs "pdfding" { };
   };
   config = lib.mkIf cfg.enable {
-    # TODO systemd service based on some existing django service in nixpgks
+    # TODO systemd service based on some existing django service in nixpkgs
     # It should allow managing via manage.py
   };
 }
