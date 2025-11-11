@@ -45,9 +45,14 @@ stdenv.mkDerivation (finalAttrs: {
     in
     fetchzip {
       url = "https://github.com/mozilla/pdf.js/releases/download/v${pdfjsVersion}/pdfjs-${pdfjsVersion}-dist.zip";
-      #hash = "sha256-f/wdLva8bsMwcETlT1LiFblbOXbDAOFOiPvpJ6Ziysk="; # v1.3.3
-      hash = "sha256-UQ7sYOh7s95mfzH2ZbfDyEvUZiXr7MI3u0WY8WNHWv4="; # v1.4.0
+      #hash = "sha256-KJ2J/pZBrZXU9mrNzD3290IHgAwoU7dsMirJX87dZrs="; # v1.3.3
+      hash = "sha256-BMWUN2J7GN5J7zwLHr1LIf25T4UmywT9hh1Lm5BqjQA="; # v1.4.0
       stripRoot = false;
+      postFetch = ''
+        rm -rf $out/web/locale \
+        $out/web/standard_fonts \
+        $out/web/compressed.tracemonkey-pldi-09.pdf
+      '';
     };
 
   nativeBuildInputs = [
