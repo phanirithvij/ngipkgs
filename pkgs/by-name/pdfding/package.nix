@@ -96,7 +96,7 @@ python.pkgs.buildPythonApplication rec {
     mv pdfding/core/settings/dev.py dev.py.bak
 
     # TODO slow step, disabling temporarily for quick iterations
-    # ${python.pythonOnBuildForHost.interpreter} pdfding/manage.py collectstatic
+    ${python.pythonOnBuildForHost.interpreter} pdfding/manage.py collectstatic
 
     # not needed, now we have staticfiles directory
     rm -rf pdfding/static
@@ -117,7 +117,6 @@ python.pkgs.buildPythonApplication rec {
 
     echo "VERSION = '${version}'" > pdfding/core/settings/version.py;
   '';
-  #echo "VERSION = '${finalAttrs.version}'" > pdfding/core/settings/version.py;
 
   postInstall = ''
     mkdir -p $out/bin
@@ -175,14 +174,11 @@ python.pkgs.buildPythonApplication rec {
     rm $out/${python.sitePackages}/pdfding/core/settings/dev.py
   '';
 
-  # TODO these are showing up in pdfding-manage PYTHONPATH (when doing interactive develop build)
-  # doCheck false does remove them, maybe it does work if tests succeed
   nativeCheckInputs = with python.pkgs; [
     pillow
     pytest-cov-stub
     pytest-django
     pytestCheckHook
-    # pythonImportsCheckHook #mkdrv
   ];
 
   #TODO disable this for quick iteration as well
@@ -236,4 +232,3 @@ python.pkgs.buildPythonApplication rec {
     mainProgram = "pdfding-manage";
   };
 }
-#})
