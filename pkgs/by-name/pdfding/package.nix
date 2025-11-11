@@ -98,6 +98,9 @@ python.pkgs.buildPythonApplication rec {
     # TODO slow step, disabling temporarily for quick iterations
     ${python.pythonOnBuildForHost.interpreter} pdfding/manage.py collectstatic
 
+    # dev.py is required so that test will run properly, restore it
+    mv pdfding/core/settings/dev.py.bak pdfding/core/settings/dev.py
+
     # not needed, now we have staticfiles directory
     rm -rf pdfding/static
 
@@ -202,7 +205,6 @@ python.pkgs.buildPythonApplication rec {
   */
   preCheck = ''
     pushd pdfding || exit 1
-
     substituteInPlace backup/tests/test_management.py backup/tests/test_tasks.py \
       --replace-fail "Path(__file__).parents[2]" "Path('$out/${python.sitePackages}/pdfding')"
   '';
