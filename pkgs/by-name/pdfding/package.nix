@@ -91,8 +91,14 @@ python.pkgs.buildPythonApplication rec {
     rm -rf pdfding/static
     ln -s ${passthru.frontend}/pdfding/static pdfding/static
 
-    # TODO slow step, disabling temporarily for quick iterations
+    # not generating staticfiles.json if it exists
+    mv pdfding/core/settings/dev.py pdfding/core/settings/dev.py.bak
+
+    # TODO slow step, can be disabled temporarily for quick iteration
     ${python.pythonOnBuildForHost.interpreter} pdfding/manage.py collectstatic
+
+    # dev.py is required so that test will run properly, restore it
+    mv pdfding/core/settings/dev.py.bak pdfding/core/settings/dev.py
 
     # not needed, now we have staticfiles directory
     rm -rf pdfding/static
@@ -117,7 +123,7 @@ python.pkgs.buildPythonApplication rec {
   postInstall = ''
     mkdir -p $out/bin
 
-    # prod build, as per dockerfile
+    # prod build so dev.py should be removed, as per the Dockerfile
     rm pdfding/core/settings/dev.py
 
     makeWrapper "$out/${python.sitePackages}/pdfding/manage.py" $out/bin/pdfding-manage \
@@ -127,7 +133,7 @@ python.pkgs.buildPythonApplication rec {
   # TODO too many mismatched deps from project's requirements, and no better solution
   # if some dep doesn't work it needs to be manually overriden via python3.override, packageOverrides
   # Or poetry2nix (remember it being abandoned) maybe magic2nix which ngipkgs already seems to import
-  # focus is to make it work in nixpkgs, ie. no 2nix. and 2nix as a last resort
+  # the focus is to make it work in nixpkgs, ie. no 2nix, and 2nix as a last resort
   pythonRelaxDeps = true;
   /*
     pythonRelaxDeps = [
@@ -170,7 +176,6 @@ python.pkgs.buildPythonApplication rec {
   */
   preCheck = ''
     pushd pdfding || exit 1
-
     substituteInPlace backup/tests/test_management.py backup/tests/test_tasks.py \
       --replace-fail "Path(__file__).parents[2]" "Path('$out/${python.sitePackages}/pdfding')"
   '';
