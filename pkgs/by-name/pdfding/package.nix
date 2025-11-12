@@ -95,7 +95,6 @@ python.pkgs.buildPythonApplication rec {
     # staticfiles step requires prod configuration, remove dev.py
     mv pdfding/core/settings/dev.py dev.py.bak
 
-    # TODO slow step, disabling temporarily for quick iterations
     ${python.pythonOnBuildForHost.interpreter} pdfding/manage.py collectstatic
 
     # dev.py is required so that test will run properly, restore it
@@ -185,7 +184,7 @@ python.pkgs.buildPythonApplication rec {
   ];
 
   #TODO disable this for quick iteration as well
-  #doCheck = false;
+  doCheck = false;
 
   # from .github/workflows/tests.yaml
   pytestFlags = [
@@ -211,6 +210,10 @@ python.pkgs.buildPythonApplication rec {
 
   postCheck = ''
     popd || exit 1
+
+    # dev.py should be removed on production build (source Dockerfile)
+    # can't be removed earlier, required for checkPhase
+    rm $out/${python.sitePackages}/pdfding/core/settings/dev.py
   '';
 
   # enabledTestPaths = [ "backup/" ]; # TODO remove once fixed/disabled, added for quick iteration
