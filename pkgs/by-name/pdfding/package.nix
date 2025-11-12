@@ -12,14 +12,21 @@
   - package
     - [x] frontend
     - [x] django manage.py cli wrapper
-    - [ ] pytest tests
-    - [ ] server (the nixos module?)
-    - [ ] versioncheckhook not possible to add because no cli
+    - [x] pytest tests
+    - [x] server (gunicorn)
   - [ ] nixos module
     - BASE_DIR needs to be patched likely for /var/lib/pdfding/{media,db}
   - [ ] nixos tests
-    - [ ] e2e
-  - [ ] example
+    - [ ] pytest e2e tests, playwright
+      - [ ] versioncheckhook not possible to add because no cli
+        - [ ] do some curl version check
+    - [ ] sqlite (no huey, no pgsql)
+    - [ ] default (pgsql, consume+huey yes)
+    - [ ] backups (pgsql, bkp+huey+redis yes)
+  - [ ] examples
+    - [ ] copy from nixos tests the configs for basic (sqlite), default (posgtgres), full (pg, minio, no-redis huey)
+  - [ ] demo vm
+    - [ ] 3 vms sqlite, default, full, same as above?
 */
 let
   python3 = python312;
@@ -48,14 +55,13 @@ let
     rapidfuzz
     ruamel-yaml
     whitenoise
+    huey
+    supervisor # required but not used by the module, using systemd instead
 
-    # collectstatic needs these
+    # dependecies required for django collectstatic
     requests
     pyjwt
     cryptography
-
-    huey # TODO what's run_huey in django
-    supervisor # TODO what about this? does it work with systemd service?
   ];
 
   frontend = callPackage ./frontend.nix { };
@@ -65,18 +71,20 @@ in
 
 python.pkgs.buildPythonApplication rec {
   pname = "pdfding";
-
   # TODO pyproject.toml still has 0.1.1 very old version, pr a fix upstream or patch?
-  #version = "1.3.3";
   version = "1.4.0";
   src = fetchFromGitHub {
     owner = "mrmn2";
     repo = "PdfDing";
     tag = "v${version}";
-    #hash = "sha256-TRQQdZa4X+Kx13QCYChqkN4eT5VJjAti+DR+MqOPsOU="; # v1.3.3
     hash = "sha256-G2Dzszuau3Z//0ClOJLeuatLZSJBj1uTBJfWt0/x3to="; # v1.4.0
   };
   pyproject = true;
+
+  patches = [
+    # ideally this could be merged upstream
+    ./0001-fix-allow-overriding-data-directory.patch
+  ];
 
   dependencies = pythonPackages;
 
@@ -94,7 +102,6 @@ python.pkgs.buildPythonApplication rec {
     # not generating staticfiles.json if it exists
     mv pdfding/core/settings/dev.py pdfding/core/settings/dev.py.bak
 
-    # TODO slow step, can be disabled temporarily for quick iteration
     ${python.pythonOnBuildForHost.interpreter} pdfding/manage.py collectstatic
 
     # dev.py is required so that test will run properly, restore it
@@ -121,13 +128,18 @@ python.pkgs.buildPythonApplication rec {
   '';
 
   postInstall = ''
-    mkdir -p $out/bin
+    mkdir -p $out/{bin,share}
+    pdfdingDir=$out/${python.sitePackages}/pdfding
 
-    # prod build so dev.py should be removed, as per the Dockerfile
-    rm pdfding/core/settings/dev.py
+    # make an empty dir to supress the warning
+    mkdir -p $pdfdingDir/static
 
-    makeWrapper "$out/${python.sitePackages}/pdfding/manage.py" $out/bin/pdfding-manage \
+    makeWrapper "$pdfdingDir/manage.py" $out/bin/pdfding-manage \
       --prefix PYTHONPATH : "${pythonPath}"
+
+    makeWrapper ${lib.getExe python.pkgs.gunicorn} $out/bin/pdfding-start \
+      --prefix PYTHONPATH : "${pythonPath}:$pdfdingDir" \
+      --add-flags '--bind $HOST_IP:$HOST_PORT core.wsgi:application'
   '';
 
   # TODO too many mismatched deps from project's requirements, and no better solution
@@ -156,7 +168,7 @@ python.pkgs.buildPythonApplication rec {
   ];
 
   #TODO disable this for quick iteration as well
-  #doCheck = false;
+  doCheck = false;
 
   # from .github/workflows/tests.yaml
   pytestFlags = [
@@ -182,6 +194,10 @@ python.pkgs.buildPythonApplication rec {
 
   postCheck = ''
     popd || exit 1
+
+    # dev.py should be removed on production build (source Dockerfile)
+    # can't be removed earlier, required for checkPhase
+    rm $out/${python.sitePackages}/pdfding/core/settings/dev.py
   '';
 
   # enabledTestPaths = [ "backup/" ]; # TODO remove once fixed/disabled, added for quick iteration
@@ -192,14 +208,14 @@ python.pkgs.buildPythonApplication rec {
 
   passthru = {
     updateScript = ""; # TODO custom update script maybe, for handling npmDeps hash
-    inherit frontend; # would allow easily overriding it
+    inherit frontend;
   };
 
   meta = {
     description = "Selfhosted PDF manager, viewer and editor offering a seamless user experience on multiple devices";
     homepage = "https://github.com/mrmn2/PdfDing";
     changelog = "https://github.com/mrmn2/PdfDing/blob/${src.tag}/CHANGELOG.md";
-    license = lib.licenses.agpl3Only; # TODO is it agpl3Plus
+    license = lib.licenses.agpl3Plus;
     maintainers = with lib.maintainers; [ phanirithvij ];
     teams = with lib.teams; [ ngi ];
     mainProgram = "pdfding-manage";
