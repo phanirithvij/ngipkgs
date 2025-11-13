@@ -1,11 +1,4 @@
-{
-  lib,
-  pkgs,
-  sources,
-  ...
-}@args:
-
-{
+args: {
   metadata = {
     summary = "Webbased selfhosted PDF manager, viewer and editor";
     subgrants.Commons = [ "PdfDing" ];
@@ -29,19 +22,31 @@
     pdfding = {
       name = "PdfDing";
       module = ./services/pdfding/module.nix;
-      examples."Enable pdfding" = {
-        module = ./services/pdfding/examples/basic.nix;
-        # TODO email is being sent to /var/mail and pdfding logs it to console
-        # https://github.com/mrmn2/PdfDing/issues/110
-        # there is an smtp setup available, maybe need to test it manually outside of these tests
-        description = ''
-          Usage instructions
+      examples = {
+        basic = {
+          module = ./services/pdfding/examples/basic.nix;
+          # TODO email is being sent to /var/mail and pdfding logs it to console
+          # https://github.com/mrmn2/PdfDing/issues/110
+          # there is an smtp setup available, maybe need to test it manually outside of these tests
+          description = ''
+            Usage instructions
 
-          1. Copy the example and run it
-          2. Visit [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser
-          3. Signup to an account with a test email
-        '';
-        tests.basic.module = import ./services/pdfding/tests/basic.nix args;
+            1. Copy the example and run it
+            2. Visit [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser
+            3. Signup to an account with a test email
+          '';
+          tests.basic.module = import ./services/pdfding/tests/basic.nix args;
+        };
+        postgres = {
+          module = ./services/pdfding/examples/postgres.nix;
+          description = ''TODO'';
+          tests.postgres.module = import ./services/pdfding/tests/postgres.nix args;
+        };
+        minio = {
+          module = ./services/pdfding/examples/minio.nix;
+          description = ''TODO'';
+          tests.postgres.module = import ./services/pdfding/tests/minio.nix args;
+        };
       };
       links = {
         build = {
@@ -50,13 +55,12 @@
         };
         test = {
           text = "Test instructions";
-          url = "<URL>";
+          url = "https://github.com/mrmn2/PdfDing/blob/master/bootstrap.sh"; # TODO maybe not
         };
       };
     };
   };
 
-  # TODO: Full service requires a demo vm?
   nixos.demo.vm = {
     module = ./demo/module.nix;
     module-demo = ./demo/module-demo.nix;
@@ -67,6 +71,6 @@
         '';
       }
     ];
-    # tests.demo.module = import ./programs/_programName_/tests/basic.nix args; # What's the equivalent for a service?
+    tests.demo.module = import ./services/pdfding/tests/postgres.nix args;
   };
 }
