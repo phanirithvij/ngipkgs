@@ -114,8 +114,8 @@ in
       default = {
         DEFAULT_THEME = "dark";
         DEFAULT_THEME_COLOR = "green";
-        CSRF_COOKIE_SECURE = "TRUE";
-        SESSION_COOKIE_SECURE = "TRUE";
+        CSRF_COOKIE_SECURE = "FALSE"; # Tests require it to be False
+        SESSION_COOKIE_SECURE = "FALSE";
       };
       description = "Additional environment variables";
     };

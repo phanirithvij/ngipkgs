@@ -1,4 +1,5 @@
 {
+  lib,
   sources,
   ...
 }:
@@ -14,14 +15,50 @@
           sources.modules.ngipkgs
           sources.modules.services.pdfding
           sources.examples.PdfDing.basic
+          "${sources.inputs.sops-nix}/modules/sops"
         ];
+
+        sops = lib.mkForce {
+          age.keyFile = "/run/keys.txt";
+          defaultSopsFile = ./sops/pdfding.yaml;
+        };
+
+        # must run before sops sets up keys
+        boot.initrd.postDeviceCommands = ''
+          cp -r ${./sops/keys.txt} /run/keys.txt
+          chmod -R 700 /run/keys.txt
+        '';
       };
   };
+
+  # Debug interactively with:
+  # - nix run .#checks.x86_64-linux.projects/PdfDing/nixos/tests/basic.driverInteractive -L
+  # - start_all() / run_tests()
+  interactive.sshBackdoor.enable = true; # ssh -o User=root vsock/3
+  interactive.nodes.machine =
+    { config, ... }:
+    {
+      # forward ports from VM to host
+      virtualisation.forwardPorts =
+        map
+          (port: {
+            from = "host";
+            host.port = port;
+            guest.port = port;
+          })
+          [
+            config.services.pdfding.port
+          ];
+
+      # forwarded ports need to be accessible
+      networking.firewall.allowedTCPPorts = [ config.services.pdfding.port ];
+    };
 
   # TODO
   # Tests the most basic user functionality expected from pdfding
   testScript =
     { nodes, ... }:
+    # py
     ''
       start_all()
 

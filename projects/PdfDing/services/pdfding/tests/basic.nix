@@ -1,9 +1,12 @@
 {
   lib,
+  pkgs,
   sources,
   ...
 }:
-
+let
+  port = 8000;
+in
 {
   name = "PdfDing sqlite";
 
@@ -28,6 +31,18 @@
           cp -r ${./sops/keys.txt} /run/keys.txt
           chmod -R 700 /run/keys.txt
         '';
+
+        environment.systemPackages = [ pkgs.pdfding ];
+        services.pdfding.port = port;
+
+        virtualisation.forwardPorts = map (port: {
+          from = "host";
+          host.port = port;
+          guest.port = port;
+        }) [ port ];
+
+        # forwarded ports need to be accessible
+        networking.firewall.allowedTCPPorts = [ port ];
       };
   };
 
@@ -38,32 +53,46 @@
   interactive.nodes.machine =
     { config, ... }:
     {
-      # forward ports from VM to host
-      virtualisation.forwardPorts =
-        map
-          (port: {
-            from = "host";
-            host.port = port;
-            guest.port = port;
-          })
-          [
-            config.services.pdfding.port
-          ];
-
-      # forwarded ports need to be accessible
-      networking.firewall.allowedTCPPorts = [ config.services.pdfding.port ];
     };
+
+  extraPythonPackages = p: [
+    p.requests
+    p.types-requests
+  ];
 
   # TODO
   # Tests the most basic user functionality expected from pdfding
   testScript =
     { nodes, ... }:
+    let
+      endpoint = "http://localhost:${toString port}";
+    in
+    # py
     ''
-      start_all()
+      import requests
 
       # start
+      start_all()
+
       # create admin
+      machine.wait_for_unit("multi-user.target")
+      machine.succeed("DJANGO_SUPERUSER_PASSWORD=test pdfding-manage createsuperuser --no-input --username admin --email root@localhost")
+
       # create normal user via API?
+      s = requests.Session()
+
+      # get the csrf token
+      r = s.get("${endpoint}/accountlogin/?next/pdf/")
+      csrf_token = r.text.split('name="csrfmiddlewaretoken" value="')[1].split('"')[0]
+
+      data = {
+        "csrfmiddlewaretoken": csrf_token,
+        "login": "root@localhost",
+        "password": "test",
+        "next": "/pdf/",
+      }
+      r = s.post("${endpoint}/accountlogin/", data=data)
+      assert r.status_code == 200, "Failed to authenticate"
 
       # make sample pdf (could be any test file or valid pdf?)
       # upload via API to user
