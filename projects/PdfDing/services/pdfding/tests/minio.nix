@@ -22,6 +22,7 @@
   # Tests the most basic user functionality expected from pdfding
   testScript =
     { nodes, ... }:
+    # py
     ''
       start_all()
 
