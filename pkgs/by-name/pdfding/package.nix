@@ -135,9 +135,11 @@ python.pkgs.buildPythonApplication rec {
     mkdir -p $pdfdingDir/static
 
     makeWrapper "$pdfdingDir/manage.py" $out/bin/pdfding-manage \
+      --set-default DATA_DIR "/var/lib/pdfding" \
       --prefix PYTHONPATH : "${pythonPath}"
 
     makeWrapper ${lib.getExe python.pkgs.gunicorn} $out/bin/pdfding-start \
+      --set-default DATA_DIR "/var/lib/pdfding" \
       --prefix PYTHONPATH : "${pythonPath}:$pdfdingDir" \
       --add-flags '--bind $HOST_IP:$HOST_PORT core.wsgi:application'
   '';
