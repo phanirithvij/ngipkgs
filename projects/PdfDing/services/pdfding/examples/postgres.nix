@@ -9,6 +9,10 @@
       owner = config.services.pdfding.user;
       group = config.services.pdfding.group;
     };
+    secrets."pdfding/database/password" = {
+      owner = config.services.pdfding.user;
+      group = config.services.pdfding.group;
+    };
   };
 
   # postgres, consume
@@ -17,5 +21,7 @@
     consume.enable = true;
     secretKeyFile = config.sops.secrets."pdfding/django/secret_key".path;
     database.createLocally = true;
+    database.type = "postgres";
+    database.passwordFile = config.sops.secrets."pdfding/database/password".path;
   };
 }
