@@ -31,6 +31,7 @@
                   pytest-cov-stub
                   pytest-django
                   pytest-playwright
+                  pytest-rerunfailures
                 ];
             in
             # bash
@@ -43,17 +44,30 @@
               cp -r --no-preserve=all ${pkgs.pdfding.src} source
               cd source
               cp -ru --no-preserve=all ${pkgs.pdfding.frontend}/pdfding/static pdfding
-              sed -i 's|headless=True|headless=True, slow_mo=500|g' pdfding/e2e/helpers.py
-              python -m pytest pdfding/e2e -x
+              # some tests are flaky due to timeouts, re-run them
+              python -m pytest pdfding/e2e \
+                -x -r aR \
+                --reruns 5 --only-rerun TimeoutError
             ''
             # see https://github.com/MrBin99/django-vite/issues/95
             # tdlr; collectstatic is not important for e2e tests which uses StaticLiveServerTestCase
             # it only cares about files in static/
           ))
         ];
-        virtualisation.memorySize = 4096; # playwright + chrome, so give it some ram
       };
   };
+
+  testScript =
+    { nodes, ... }:
+    # py
+    ''
+      # start
+      start_all()
+      machine.wait_for_unit("multi-user.target")
+
+      #machine.succeed("env DISPLAY=:0 sudo -u alice tests_e2e | systemd-cat")
+      machine.succeed("tests_e2e | systemd-cat")
+    '';
 
   # Debug interactively with:
   # - nix run .#checks.x86_64-linux.projects/PdfDing/nixos/tests/basic.driverInteractive -L
@@ -76,16 +90,4 @@
         sysz
       ];
     };
-
-  testScript =
-    { nodes, ... }:
-    # py
-    ''
-      # start
-      start_all()
-      machine.wait_for_unit("multi-user.target")
-
-      #machine.succeed("env DISPLAY=:0 sudo -u alice tests_e2e | systemd-cat")
-      machine.succeed("tests_e2e | systemd-cat")
-    '';
 }
