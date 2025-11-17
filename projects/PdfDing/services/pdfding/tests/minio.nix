@@ -4,9 +4,6 @@
   sources,
   ...
 }:
-let
-  port = 8000;
-in
 {
   name = "PdfDing minio backups";
 
@@ -33,51 +30,23 @@ in
         '';
 
         environment.systemPackages = with pkgs; [
-          pdfding
           minio-client
           sqlite
         ];
 
-        services.pdfding.port = port;
-
-        # TODO figure out how to access `config` in testScript or hardcode or leave this as is
-        environment.etc."minio-creds-path".text = config.sops.templates."minio-creds".path;
+        services.pdfding.installWrapper = true;
       };
   };
-  # Debug interactively with:
-  # - nix run .#checks.x86_64-linux.projects/PdfDing/nixos/tests/basic.driverInteractive -L
-  # - start_all() / run_tests()
-  interactive.sshBackdoor.enable = true; # ssh -o User=root vsock%3
-  interactive.nodes.machine =
-    { config, ... }:
-    let
-      ports = [
-        port
-        9000
-        9001
-      ];
-    in
-    {
-      # not needed, only for manual interactive debugging
-      virtualisation.memorySize = 4096;
-      environment.systemPackages = with pkgs; [
-        btop
-        sysz
-      ];
-
-      virtualisation.forwardPorts = map (port: {
-        from = "host";
-        host.port = port;
-        guest.port = port;
-      }) ports;
-
-      # forwarded ports need to be accessible
-      networking.firewall.allowedTCPPorts = ports;
-    };
 
   # Tests the most basic user functionality expected from pdfding backup service
   testScript =
     { nodes, ... }:
+    let
+      inherit (nodes.machine.services.pdfding)
+        port
+        dataDir
+        ;
+    in
     # py
     ''
       # start
@@ -124,20 +93,50 @@ in
       """)
 
       # verify pdf in user's dir
-      machine.succeed("test -f /var/lib/pdfding/media/1/pdf/*.pdf")
+      machine.succeed("test -f ${dataDir}/media/1/pdf/*.pdf")
 
       # verify one entry exists in sqlite db
-      machine.succeed("sqlite3 /var/lib/pdfding/db/db.sqlite3 'SELECT COUNT(*) FROM pdf_pdf' | grep -q '^1$'")
+      machine.succeed("sqlite3 ${dataDir}/db/db.sqlite3 'SELECT COUNT(*) FROM pdf_pdf' | grep -q '^1$'")
 
       machine.succeed("""
-        source $(cat /etc/minio-creds-path)
+        source /run/secrets/rendered/minio-creds
         mc alias set local http://127.0.0.1:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD
       """)
 
-      # wait one min (TODO can backup be triggered immediately?)
       machine.sleep(64)
 
       # verify minio has that pdf file
       machine.succeed("mc stat local/pdfding/1/pdf/dummy.pdf")
     '';
+
+  # Debug interactively with:
+  # - nix run .#checks.x86_64-linux.projects/PdfDing/nixos/tests/basic.driverInteractive -L
+  # - start_all() / run_tests()
+  interactive.sshBackdoor.enable = true; # ssh -o User=root vsock%3
+  interactive.nodes.machine =
+    { config, ... }:
+    let
+      ports = [
+        config.services.pdfding.port
+        9000
+        9001
+      ];
+    in
+    {
+      # not needed, only for manual interactive debugging
+      virtualisation.memorySize = 4096;
+      environment.systemPackages = with pkgs; [
+        btop
+        sysz
+      ];
+
+      virtualisation.forwardPorts = map (port: {
+        from = "host";
+        host.port = port;
+        guest.port = port;
+      }) ports;
+
+      # forwarded ports need to be accessible
+      networking.firewall.allowedTCPPorts = ports;
+    };
 }
