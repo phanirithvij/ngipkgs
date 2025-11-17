@@ -1,9 +1,12 @@
 {
   lib,
+  pkgs,
   sources,
   ...
 }:
-
+let
+  port = 8000;
+in
 {
   name = "PdfDing default";
 
@@ -15,6 +18,7 @@
           sources.modules.ngipkgs
           sources.modules.services.pdfding
           sources.examples.PdfDing.basic
+          sources.examples.PdfDing.postgres
           "${sources.inputs.sops-nix}/modules/sops"
         ];
 
@@ -28,6 +32,18 @@
           cp -r ${./sops/keys.txt} /run/keys.txt
           chmod -R 700 /run/keys.txt
         '';
+
+        environment.systemPackages = [ pkgs.pdfding ];
+        services.pdfding.port = port;
+
+        virtualisation.forwardPorts = map (port: {
+          from = "host";
+          host.port = port;
+          guest.port = port;
+        }) [ port ];
+
+        # forwarded ports need to be accessible
+        networking.firewall.allowedTCPPorts = [ port ];
       };
   };
 
@@ -38,29 +54,22 @@
   interactive.nodes.machine =
     { config, ... }:
     {
-      # forward ports from VM to host
-      virtualisation.forwardPorts =
-        map
-          (port: {
-            from = "host";
-            host.port = port;
-            guest.port = port;
-          })
-          [
-            config.services.pdfding.port
-          ];
-
-      # forwarded ports need to be accessible
-      networking.firewall.allowedTCPPorts = [ config.services.pdfding.port ];
+      # not needed, only for manual interactive debugging
+      virtualisation.memorySize = 4096;
+      environment.systemPackages = with pkgs; [
+        btop
+        sysz
+      ];
     };
 
   # TODO
-  # Tests the most basic user functionality expected from pdfding
+  # Tests the most basic user functionality expected from pdfding with postgres
   testScript =
     { nodes, ... }:
     # py
     ''
       start_all()
+      machine.wait_for_unit("pdfding.service")
 
       # start
       # create admin
@@ -72,7 +81,5 @@
       # https://github.com/mrmn2/PdfDing/blob/master/docs/guides.md#consumption-directory
       # make user consume pdfs via admin
       # test if user can access via API
-
-      machine.succeed()
     '';
 }

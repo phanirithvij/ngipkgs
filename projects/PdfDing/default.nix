@@ -47,15 +47,16 @@ args: {
           description = ''TODO'';
           tests.postgres.module = import ./services/pdfding/tests/minio.nix args;
         };
+        e2e = {
+          module = ./services/pdfding/examples/basic.nix;
+          description = ''TODO not an example, something like a nixosTest'';
+          tests.e2e.module = import ./services/pdfding/tests/e2e.nix args;
+        };
       };
       links = {
         build = {
           text = "Build from source";
           url = "https://github.com/mrmn2/PdfDing/blob/master/Dockerfile";
-        };
-        test = {
-          text = "Test instructions";
-          url = "https://github.com/mrmn2/PdfDing/blob/master/bootstrap.sh"; # TODO maybe not
         };
       };
     };
