@@ -1,6 +1,8 @@
-{ ... }:
-
-#TODO backups, consume, huey, huey w/ redis and whatnot
+{ config, ... }:
 {
-  services.pdfding.enable = true;
+  # backups, consume, huey, huey w/ redis
+  services.pdfding = {
+    enable = true;
+    secretKeyFile = config.sops.secrets."pdfding/django/secret_key".path;
+  };
 }
