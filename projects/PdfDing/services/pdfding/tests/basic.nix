@@ -66,8 +66,8 @@ in
     p.types-requests
   ];
 
-  # TODO
   # Tests the most basic user functionality expected from pdfding
+  # heavy e2e test suite is ran on e2e.nix
   testScript =
     { nodes, ... }:
     let
