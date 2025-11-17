@@ -57,6 +57,8 @@ let
     whitenoise
     huey
     supervisor # required but not used by the module, using systemd instead
+    pillow
+    oauthlib
 
     # dependecies required for django collectstatic
     requests
@@ -163,7 +165,6 @@ python.pkgs.buildPythonApplication rec {
   */
 
   nativeCheckInputs = with python.pkgs; [
-    pillow
     pytest-cov-stub
     pytest-django
     pytestCheckHook
