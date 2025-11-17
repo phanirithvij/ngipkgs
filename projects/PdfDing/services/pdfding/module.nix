@@ -8,7 +8,6 @@ let
   inherit (lib)
     concatStringsSep
     filterAttrs
-    literalExpression
     mapAttrsToList
     mkEnableOption
     mkOption
@@ -53,17 +52,25 @@ let
   );
 
   loadCreds =
-    optionalString usePostgres
-      # bash
-      ''
-        export POSTGRES_PASSWORD="$(<$CREDENTIALS_DIRECTORY/db_password)"
-      '';
+    optionalString usePostgres ''
+      export POSTGRES_PASSWORD="$(<${cfg.database.passwordFile})"
+    ''
+    + ''
+      export SECRET_KEY="$(<${cfg.secretKeyFile})"
+    '';
 
   secretRecommendation = "Consider using a secret managing scheme such as `agenix` or `sops-nix` to generate this file.";
 in
 {
   options.services.pdfding = {
-    enable = mkEnableOption "PdfDing service";
+    enable = mkEnableOption "PdfDing service" // {
+      description = ''
+        Whether to enable pdfding.
+
+        To use the management CLI (pdfding-manage), add your user to the pdfding group:
+          users.users.<youruser>.extraGroups = [ "pdfding" ];
+      '';
+    };
 
     package = lib.mkPackageOption pkgs "pdfding" { };
 
@@ -107,13 +114,15 @@ in
       description = "Domains where PdfDing is allowed to run";
     };
 
-    gunicorn = {
-      extraArgs = mkOption {
-        type = types.str;
-        description = "Command line arguments passed to Gunicorn server.";
-        defaultText = literalExpression "\"--workers=4 --max-requests=1200 --max-requests-jitter=50 --log-level=error\"";
-        default = "--workers=4 --max-requests=1200 --max-requests-jitter=50 --log-level=error";
-      };
+    gunicorn.extraArgs = mkOption {
+      type = types.listOf types.str;
+      description = "Command line arguments passed to Gunicorn server.";
+      default = [
+        "--workers=4"
+        "--max-requests=1200"
+        "--max-requests-jitter=50"
+        "--log-level=error"
+      ];
     };
 
     extraEnvironment = mkOption {
@@ -188,20 +197,45 @@ in
       };
     };
 
-    consume = {
-      enable = mkOption {
-        type = types.bool;
-        default = false;
-        description = "Enable consume functionality";
-      };
+    consume.enable = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Bulk PDF import from consume directory.
+
+        When enabled, administrators can create per-user directories like /var/lib/pdfding/consume/<user_id>
+        with permissions allowing the pdfding user to read and write.
+        PDFs placed in these directories are automatically imported into user accounts.
+
+        PDFs are imported periodically via cronjob and successfully imported files
+        are automatically deleted from the consume directory.
+      '';
     };
 
-    backup = {
-      enable = mkOption {
-        type = types.bool;
-        default = false;
-        description = "Enable backup functionality";
-      };
+    backup.enable = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Automatic backup of important data to a MinIO instance.
+
+        When enabled and properly configured via environment variables,
+        important data is periodically uploaded to the specified MinIO
+        instance via cronjob.
+      '';
+    };
+
+    installWrapper = mkOption {
+      type = types.bool;
+      default = true;
+      description = ''
+        This will add pdfding-manage admin cli to environment.systemPackages
+      '';
+    };
+
+    openFirewall = lib.mkOption {
+      type = types.bool;
+      default = false;
+      description = "Open ports in the firewall for the PdfDing web interface.";
     };
   };
 
@@ -221,8 +255,23 @@ in
       }
     ];
 
-    # TODO finalPackage
-    environment.systemPackages = [ ];
+    networking.firewall = lib.mkIf cfg.openFirewall {
+      allowedTCPPorts = [ cfg.port ];
+    };
+
+    environment.systemPackages =
+      let
+        pdfding-manage = pkgs.writeShellScriptBin "pdfding-manage" ''
+          set -eou pipefail
+          set -a
+          ${lib.toShellVars cfg.extraEnvironment}
+          ${lib.concatMapStringsSep "\n" (f: "source ${f}") cfg.envFiles}
+          set +a
+          ${loadCreds}
+          ${config.security.wrapperDir}/sudo -E -u ${cfg.user} ${lib.getExe cfg.package} "$@"
+        '';
+      in
+      lib.optionals cfg.installWrapper [ pdfding-manage ];
 
     users.users.${cfg.user} = {
       isSystemUser = true;
@@ -233,16 +282,12 @@ in
 
     users.groups.${cfg.group} = { };
 
-    services.pdfding.envFiles = [
-      cfg.secretKeyFile
-      envFile
-    ];
+    services.pdfding.envFiles = [ envFile ];
 
     systemd.services.pdfding =
       let
         databaseServices =
-          [ ]
-          ++ (optional usePostgres "postgresql.target")
+          (optional usePostgres "postgresql.target")
           ++ (optional cfg.database.createLocally "pdfdingPostgreSQLInit.service");
       in
       {
@@ -265,7 +310,11 @@ in
               done
             ''
           }
-          mkdir -p ${cfg.dataDir}/{db,media,consume}
+          mkdir -p ${cfg.dataDir}/{db,media}
+
+          ${optionalString cfg.consume.enable ''
+            mkdir -p ${cfg.dataDir}/consume
+          ''}
 
           ${cfg.package}/bin/pdfding-manage migrate
           ${cfg.package}/bin/pdfding-manage clean_up
@@ -277,10 +326,9 @@ in
           Group = cfg.group;
           ExecStart = pkgs.writeShellScript "exec-start" ''
             ${loadCreds}
-            exec ${cfg.package}/bin/pdfding-start ${cfg.gunicorn.extraArgs}
+            exec ${cfg.package}/bin/pdfding-start ${builtins.toString cfg.gunicorn.extraArgs}
           '';
           EnvironmentFile = cfg.envFiles;
-          LoadCredential = lib.optional usePostgres "db_password:${cfg.database.passwordFile}";
           NoNewPrivileges = true;
           PrivateTmp = true;
           PrivateDevices = true;
@@ -302,7 +350,6 @@ in
         Group = cfg.group;
         WorkingDirectory = cfg.dataDir;
         EnvironmentFile = cfg.envFiles;
-        LoadCredential = lib.optional usePostgres "db_password:${cfg.database.passwordFile}";
         ExecStart = pkgs.writeShellScript "exec-start" ''
           ${loadCreds}
           exec ${cfg.package}/bin/pdfding-manage run_huey;
@@ -321,7 +368,6 @@ in
     };
 
     # postgres setup
-
     services.postgresql.enable = lib.mkDefault (usePostgres && cfg.database.createLocally);
 
     # copied from keycloak module in nixpkgs
@@ -337,24 +383,25 @@ in
         Group = "postgres";
         LoadCredential = [ "db_password:${cfg.database.passwordFile}" ];
       };
-      script = ''
-        set -o errexit -o pipefail -o nounset -o errtrace
-        shopt -s inherit_errexit
+      script =
+        # bash
+        ''
+          set -o errexit -o pipefail -o nounset -o errtrace
+          shopt -s inherit_errexit
 
-        create_role="$(mktemp)"
-        trap 'rm -f "$create_role"' EXIT
+          create_role="$(mktemp)"
+          trap 'rm -f "$create_role"' EXIT
 
-        # Read the password from the credentials directory and
-        # escape any single quotes by adding additional single
-        # quotes after them, following the rules laid out here:
-        # https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS
-        db_password="$(<"$CREDENTIALS_DIRECTORY/db_password")"
-        db_password="''${db_password//\'/\'\'}"
+          # escape any single quotes by adding additional single
+          # quotes after them, following the rules laid out here:
+          # https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS
+          POSTGRES_PASSWORD="$(<"$CREDENTIALS_DIRECTORY/db_password")"
+          POSTGRES_PASSWORD="''${POSTGRES_PASSWORD//\'/\'\'}"
 
-        echo "CREATE ROLE pdfding WITH LOGIN PASSWORD '$db_password' CREATEDB" > "$create_role"
-        psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='pdfding'" | grep -q 1 || psql -tA --file="$create_role"
-        psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'pdfding'" | grep -q 1 || psql -tAc 'CREATE DATABASE "pdfding" OWNER "pdfding"'
-      '';
+          echo "CREATE ROLE pdfding WITH LOGIN PASSWORD '$POSTGRES_PASSWORD' CREATEDB" > "$create_role"
+          psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='pdfding'" | grep -q 1 || psql -tA --file="$create_role"
+          psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'pdfding'" | grep -q 1 || psql -tAc 'CREATE DATABASE "pdfding" OWNER "pdfding"'
+        '';
       enableStrictShellChecks = true;
     };
   };
