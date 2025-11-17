@@ -1,6 +1,6 @@
 {
   lib,
-  python312,
+  python3,
   callPackage,
   fetchFromGitHub,
   makeWrapper,
@@ -29,7 +29,6 @@
     - [ ] 3 vms sqlite, default, full, same as above?
 */
 let
-  python3 = python312;
   python = python3.override {
     self = python;
     packageOverrides = final: prev: {
