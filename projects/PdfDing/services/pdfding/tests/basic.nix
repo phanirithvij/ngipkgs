@@ -53,6 +53,12 @@ in
   interactive.nodes.machine =
     { config, ... }:
     {
+      # not needed, only for manual interactive debugging
+      virtualisation.memorySize = 4096;
+      environment.systemPackages = with pkgs; [
+        btop
+        sysz
+      ];
     };
 
   extraPythonPackages = p: [

@@ -177,7 +177,6 @@ python.pkgs.buildPythonApplication rec {
   '';
 
   nativeCheckInputs = with python.pkgs; [
-    pillow
     pytest-cov-stub
     pytest-django
     pytestCheckHook
