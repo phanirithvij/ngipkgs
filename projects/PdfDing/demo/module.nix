@@ -2,10 +2,7 @@
 {
   services.pdfding = {
     enable = true;
-    port = 8181; # default is 8000
-    secretKeyFile = pkgs.writeText "django_secret" ''
-      SECRET_KEY="pdfding-demo-vm"
-    '';
+    openFirewall = true;
+    secretKeyFile = pkgs.writeText "django_secret" "foobarbaz";
   };
-  networking.firewall.allowedTCPPorts = [ 8181 ];
 }
