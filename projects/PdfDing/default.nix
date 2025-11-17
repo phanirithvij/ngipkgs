@@ -1,26 +1,33 @@
-args: {
+{
+  lib,
+  pkgs,
+  sources,
+  ...
+}@args:
+{
   metadata = {
     summary = "Webbased selfhosted PDF manager, viewer and editor";
-    subgrants.Commons = [ "PdfDing" ];
+    subgrants.Commons = [
+      "PdfDing"
+    ];
     links = {
       repo = {
         text = "Source repository";
         url = "https://github.com/mrmn2/PdfDing";
       };
       homepage = {
-        text = "Repository Readme";
-        url = "https://github.com/mrmn2/PdfDing/blob/master/README.md";
+        text = "Homepage";
+        url = "https://www.pdfding.com";
       };
       docs = {
         text = "Documentation";
-        url = "https://github.com/mrmn2/PdfDing/blob/master/docs/guides.md";
+        url = "https://docs.pdfding.com";
       };
     };
   };
 
   nixos.modules.services = {
     pdfding = {
-      name = "PdfDing";
       module = ./services/pdfding/module.nix;
       examples = {
         basic = {
