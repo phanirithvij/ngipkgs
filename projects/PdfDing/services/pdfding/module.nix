@@ -11,7 +11,6 @@ let
     literalExpression
     mapAttrsToList
     mkEnableOption
-    mkIf
     mkOption
     optional
     optionalAttrs
@@ -33,9 +32,9 @@ let
     DATA_DIR = "${cfg.dataDir}";
   }
   // optionalAttrs usePostgres {
+    POSTGRES_PORT = builtins.toString cfg.database.port;
     POSTGRES_HOST = cfg.database.host;
-    POSTGRES_PORT = toString cfg.database.port;
-    POSTGRES_DB = cfg.database.name;
+    POSTGRES_NAME = cfg.database.name;
     POSTGRES_USER = cfg.database.user;
   }
   // optionalAttrs cfg.consume.enable {
@@ -51,6 +50,13 @@ let
       mapAttrsToList (name: value: "${name}=${toString value}") (filterAttrs (n: v: v != "") envVars)
     )
   );
+
+  loadCreds = ''
+    ${optionalString usePostgres ''
+      export POSTGRES_PASSWORD="$(<$CREDENTIALS_DIRECTORY/db_password)"
+    ''}
+    export SECRET_KEY="$(<$CREDENTIALS_DIRECTORY/secret_key)"
+  '';
 
   secretRecommendation = "Consider using a secret managing scheme such as `agenix` or `sops-nix` to generate this file.";
 in
@@ -201,7 +207,7 @@ in
     };
   };
 
-  config = mkIf cfg.enable {
+  config = lib.mkIf cfg.enable {
     assertions = [
       {
         assertion = cfg.secretKeyFile != null;
@@ -213,17 +219,6 @@ in
       }
     ];
 
-    services.postgresql = mkIf (usePostgres && cfg.database.createLocally) {
-      enable = true;
-      ensureDatabases = [ cfg.database.name ];
-      ensureUsers = [
-        {
-          name = cfg.database.user;
-          ensureDBOwnership = true;
-        }
-      ];
-    };
-
     users.users.${cfg.user} = {
       isSystemUser = true;
       group = cfg.group;
@@ -233,53 +228,64 @@ in
 
     users.groups.${cfg.group} = { };
 
-    systemd.services.pdfding = {
-      description = "PdfDing Web Service";
-      after = [
-        "network.target"
-      ]
-      ++ optional (usePostgres && cfg.database.createLocally) "postgresql.service";
-      wants = optional (usePostgres && cfg.database.createLocally) "postgresql.service";
-      wantedBy = [ "multi-user.target" ];
-
-      preStart = ''
-        ${optionalString usePostgres
-          # bash
-          ''
-            until ${pkgs.postgresql}/bin/pg_isready -h ${cfg.database.host} -p ${toString cfg.database.port}; do
-              echo "Waiting for PostgreSQL..."
-              sleep 1
-            done
-          ''
-        }
-        mkdir -p ${cfg.dataDir}/{db,media,consume}
-
-        ${cfg.package}/bin/pdfding-manage migrate
-        ${cfg.package}/bin/pdfding-manage clean_up
-      '';
-
-      serviceConfig = {
-        Type = "exec";
-        User = cfg.user;
-        Group = cfg.group;
-        ExecStart = "${cfg.package}/bin/pdfding-start ${cfg.gunicorn.extraArgs}";
-        EnvironmentFile = [
-          envFile
-          cfg.secretKeyFile
+    systemd.services.pdfding =
+      let
+        databaseServices =
+          [ ]
+          ++ (optional usePostgres "postgresql.target")
+          ++ (optional cfg.database.createLocally "pdfdingPostgreSQLInit.service");
+      in
+      {
+        description = "PdfDing Web Service";
+        after = [
+          "network.target"
         ]
-        ++ optional (usePostgres && cfg.database.passwordFile != null) cfg.database.passwordFile;
-        NoNewPrivileges = true;
-        PrivateTmp = true;
-        PrivateDevices = true;
-        ProtectSystem = "strict";
-        ProtectHome = true;
-        ReadWritePaths = [ cfg.dataDir ];
-        Restart = "on-failure";
-        RestartSec = "5s";
-      };
-    };
+        ++ databaseServices;
+        bindsTo = databaseServices;
+        wantedBy = [ "multi-user.target" ];
 
-    systemd.services.pdfding-huey = mkIf cfg.huey.enable {
+        preStart = ''
+          ${loadCreds}
+          ${optionalString usePostgres
+            # bash
+            ''
+              until ${pkgs.postgresql}/bin/pg_isready -h ${cfg.database.host} -p ${toString cfg.database.port}; do
+                echo "Waiting for PostgreSQL..."
+                sleep 1
+              done
+            ''
+          }
+          mkdir -p ${cfg.dataDir}/{db,media,consume}
+
+          ${cfg.package}/bin/pdfding-manage migrate
+          ${cfg.package}/bin/pdfding-manage clean_up
+        '';
+
+        serviceConfig = {
+          Type = "exec";
+          User = cfg.user;
+          Group = cfg.group;
+          ExecStart = pkgs.writeShellScript "exec-start" ''
+            ${loadCreds}
+            exec ${cfg.package}/bin/pdfding-start ${cfg.gunicorn.extraArgs}
+          '';
+          EnvironmentFile = [ envFile ];
+          LoadCredential = [
+            "secret_key:${cfg.secretKeyFile}"
+          ]
+          ++ lib.optional usePostgres "db_password:${cfg.database.passwordFile}";
+          NoNewPrivileges = true;
+          PrivateTmp = true;
+          PrivateDevices = true;
+          ProtectSystem = "strict";
+          ProtectHome = true;
+          ReadWritePaths = [ cfg.dataDir ];
+          Restart = "on-failure";
+          RestartSec = "5s";
+        };
+      };
+
+    systemd.services.pdfding-huey = lib.mkIf cfg.huey.enable {
       description = "PdfDing Background Tasks (Huey)";
       after = [ "pdfding.service" ];
       wantedBy = [ "multi-user.target" ];
@@ -288,8 +294,16 @@ in
         User = cfg.user;
         Group = cfg.group;
         WorkingDirectory = cfg.dataDir;
-        ExecStart = "${cfg.package}/bin/pdfding-manage run_huey";
         EnvironmentFile = [ envFile ];
+        LoadCredential = [
+          "secret_key:${cfg.secretKeyFile}"
+        ]
+        ++ lib.optional usePostgres "db_password:${cfg.database.passwordFile}";
+        ExecStart = pkgs.writeShellScript "exec-start" ''
+          ${loadCreds}
+          exec ${cfg.package}/bin/pdfding-manage run_huey;
+        '';
+
         NoNewPrivileges = true;
         PrivateTmp = true;
         PrivateDevices = true;
@@ -300,6 +314,44 @@ in
         RestartSec = "5s";
         TimeoutStopSec = 30;
       };
+    };
+
+    # postgres setup
+
+    services.postgresql.enable = lib.mkDefault (usePostgres && cfg.database.createLocally);
+
+    # copied from keycloak module in nixpkgs
+    systemd.services.pdfdingPostgreSQLInit = lib.mkIf (usePostgres && cfg.database.createLocally) {
+      after = [ "postgresql.target" ];
+      before = [ "pdfding.service" ];
+      bindsTo = [ "postgresql.target" ];
+      path = [ config.services.postgresql.package ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = "postgres";
+        Group = "postgres";
+        LoadCredential = [ "db_password:${cfg.database.passwordFile}" ];
+      };
+      script = ''
+        set -o errexit -o pipefail -o nounset -o errtrace
+        shopt -s inherit_errexit
+
+        create_role="$(mktemp)"
+        trap 'rm -f "$create_role"' EXIT
+
+        # Read the password from the credentials directory and
+        # escape any single quotes by adding additional single
+        # quotes after them, following the rules laid out here:
+        # https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS
+        db_password="$(<"$CREDENTIALS_DIRECTORY/db_password")"
+        db_password="''${db_password//\'/\'\'}"
+
+        echo "CREATE ROLE pdfding WITH LOGIN PASSWORD '$db_password' CREATEDB" > "$create_role"
+        psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='pdfding'" | grep -q 1 || psql -tA --file="$create_role"
+        psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'pdfding'" | grep -q 1 || psql -tAc 'CREATE DATABASE "pdfding" OWNER "pdfding"'
+      '';
+      enableStrictShellChecks = true;
     };
   };
 }
