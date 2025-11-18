@@ -33,9 +33,7 @@ stdenv.mkDerivation (finalAttrs: {
   '';
 
   passthru = {
-    # version from pdfding dockerfile
-    # TODO handle in updateScript
-    pdfjsVersion = "5.4.296";
+    pdfjsVersion = "5.4.296"; # see update script
     pdfjsHash = "sha256-b4W7wETq2CIZm2rJCmXEYvPhQtCbXS76L7GDvng6wn4=";
     pdfjs = fetchzip {
       url = "https://github.com/mozilla/pdf.js/releases/download/v${finalAttrs.passthru.pdfjsVersion}/pdfjs-${finalAttrs.passthru.pdfjsVersion}-dist.zip";

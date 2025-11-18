@@ -14,8 +14,9 @@
     - [x] django manage.py cli wrapper
     - [x] pytest tests
     - [x] server (gunicorn)
+    - [ ] updateScript
   - [ ] nixos module
-    - BASE_DIR needs to be patched likely for /var/lib/pdfding/{media,db}
+    - [x] BASE_DIR needs to be patched likely for /var/lib/pdfding/{media,db}
   - [ ] nixos tests
     - [ ] pytest e2e tests, playwright
       - [ ] versioncheckhook not possible to add because no cli
