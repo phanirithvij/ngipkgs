@@ -73,12 +73,12 @@ in
 python.pkgs.buildPythonApplication rec {
   pname = "pdfding";
   # TODO pyproject.toml still has 0.1.1 very old version, pr a fix upstream or patch?
-  version = "1.4.0";
+  version = "1.4.1";
   src = fetchFromGitHub {
     owner = "mrmn2";
     repo = "PdfDing";
     tag = "v${version}";
-    hash = "sha256-G2Dzszuau3Z//0ClOJLeuatLZSJBj1uTBJfWt0/x3to="; # v1.4.0
+    hash = "sha256-8e80gMdB6U3977dIU7bIAAEguYmi+AWQgUgYPDLCYLI=";
   };
   pyproject = true;
 
