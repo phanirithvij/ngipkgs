@@ -32,23 +32,25 @@ stdenv.mkDerivation (finalAttrs: {
        | ${lib.getExe' moreutils "sponge"} package.json
   '';
 
-  # TODO pdfjs comes with js source maps, should they be removed in postFetch?
-  pdfjs =
-    let
-      # version from pdfding dockerfile
-      # TODO handle in updateScript
-      pdfjsVersion = "5.4.296";
-    in
-    fetchzip {
-      url = "https://github.com/mozilla/pdf.js/releases/download/v${pdfjsVersion}/pdfjs-${pdfjsVersion}-dist.zip";
-      hash = "sha256-BMWUN2J7GN5J7zwLHr1LIf25T4UmywT9hh1Lm5BqjQA=";
+  passthru = {
+    # version from pdfding dockerfile
+    # TODO handle in updateScript
+    pdfjsVersion = "5.4.296";
+    pdfjsHash = "sha256-b4W7wETq2CIZm2rJCmXEYvPhQtCbXS76L7GDvng6wn4=";
+    pdfjs = fetchzip {
+      url = "https://github.com/mozilla/pdf.js/releases/download/v${finalAttrs.passthru.pdfjsVersion}/pdfjs-${finalAttrs.passthru.pdfjsVersion}-dist.zip";
+      hash = finalAttrs.passthru.pdfjsHash;
       stripRoot = false;
       postFetch = ''
         rm -rf $out/web/locale \
         $out/web/standard_fonts \
         $out/web/compressed.tracemonkey-pldi-09.pdf
+
+        # remove source maps
+        find "$out" -name '*.map' -exec rm -f '{}' \;
       '';
     };
+  };
 
   nativeBuildInputs = [
     nodejs
@@ -62,7 +64,7 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preBuild
     mkdir -p $out/pdfding
     cp -r --no-preserve=mode pdfding/static $out/pdfding/static
-    cp -r --no-preserve=mode $pdfjs $out/pdfding/static/pdfjs
+    cp -r --no-preserve=mode ${finalAttrs.passthru.pdfjs} $out/pdfding/static/pdfjs
 
     tailwindcss -i $out/pdfding/static/css/input.css -o $out/pdfding/static/css/tailwind.css --minify
     rm $out/pdfding/static/css/input.css
