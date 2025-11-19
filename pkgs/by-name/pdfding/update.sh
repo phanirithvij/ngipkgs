@@ -52,7 +52,7 @@ pdfjs_version="$(grep 'PDFJS_VERSION=' "$src/Dockerfile" | cut -d'=' -f2)"
 sed -i "s|pdfjsVersion = .*;|pdfjsVersion = \"$pdfjs_version\";|" "$PACKAGE_DIR/frontend.nix"
 
 # pdfjs hash
-sed -i "s|pdfjsHash = .*;|pdfjsHash = lib.fakeHash;|" "$PACKAGE_DIR/frontend.nix"
+sed -i "s|pdfjsHash = .*;|pdfjsHash = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\";|" "$PACKAGE_DIR/frontend.nix"
 
 set +e
 new_pdfjs_hash="$(
@@ -60,4 +60,4 @@ new_pdfjs_hash="$(
 )"
 set -e
 
-sed -i "s|lib\.fakeHash|\"$new_pdfjs_hash\"|g" "$PACKAGE_DIR/frontend.nix"
+sed -i "s|\"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\"|\"$new_pdfjs_hash\"|g" "$PACKAGE_DIR/frontend.nix"

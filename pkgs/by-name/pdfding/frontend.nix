@@ -1,14 +1,11 @@
 {
-  lib,
   stdenv,
-  fetchzip,
-  fetchFromGitHub,
   nodejs,
   npmHooks,
   fetchNpmDeps,
+  fetchzip,
+  fetchFromGitHub,
   tailwindcss_4,
-  moreutils,
-  jq,
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname = "pdfding-frontend";
@@ -26,11 +23,9 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-v1NFqDnFcRK8sd0bV3ck+LLMYQ90Dl1R1OnBTwWUVUg=";
   };
 
-  # npm error Invalid package, must have name and version
-  postPatch = ''
-    ${lib.getExe jq} '. += { "name": "pdfding-frontend", "version": "${finalAttrs.version}" }' package.json \
-      | ${lib.getExe' moreutils "sponge"} package.json
-  '';
+  patches = [
+    ./add-version.patch
+  ];
 
   passthru = {
     pdfjsVersion = "5.4.296"; # see update script

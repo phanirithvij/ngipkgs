@@ -3,6 +3,7 @@
   python3,
   callPackage,
   fetchFromGitHub,
+  fetchpatch2,
   makeWrapper,
 }:
 /*
@@ -73,8 +74,6 @@ in
 
 python.pkgs.buildPythonApplication rec {
   pname = "pdfding";
-  # pyproject.toml still has 0.1.1 very old version
-  # follow https://github.com/mrmn2/PdfDing/pull/203
   version = "1.4.1";
   src = fetchFromGitHub {
     owner = "mrmn2";
@@ -85,8 +84,16 @@ python.pkgs.buildPythonApplication rec {
   pyproject = true;
 
   patches = [
+    # remove in 1.4.2 (next version after 1.4.1)
+    # patch to add data_dir
     # https://github.com/mrmn2/PdfDing/pull/202
-    ./0001-fix-allow-overriding-data-directory.patch
+    (fetchpatch2 {
+      url = "https://github.com/mrmn2/PdfDing/commit/387ca2079f74844203e2e91fac00e0d0e0e5fdb9.patch?full_index=1";
+      hash = "sha256-VGjyIAVi+qd2WZ8FVKKC2ijLinoflO7RmPwIW1/oGcY=";
+    })
+    # pyproject.toml still has 0.1.1 very old version
+    # follow https://github.com/mrmn2/PdfDing/pull/203
+    ./add-version.patch
   ];
 
   dependencies = pythonPackages;
