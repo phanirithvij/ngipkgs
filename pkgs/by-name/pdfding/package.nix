@@ -73,7 +73,8 @@ in
 
 python.pkgs.buildPythonApplication rec {
   pname = "pdfding";
-  # TODO pyproject.toml still has 0.1.1 very old version, pr a fix upstream or patch?
+  # pyproject.toml still has 0.1.1 very old version
+  # follow https://github.com/mrmn2/PdfDing/pull/203
   version = "1.4.1";
   src = fetchFromGitHub {
     owner = "mrmn2";
@@ -114,17 +115,17 @@ python.pkgs.buildPythonApplication rec {
 
     # remove django md5 hash from filenames of pdfjs as it will mess up the relative imports because of the whitenoise setup
     sh -x \
-        && export PDFJS_PATH="pdfding/staticfiles/pdfjs" \
-        && for file_name in $(find $PDFJS_PATH -type f -not -path "$PDFJS_PATH/web/images/*");  \
-           do \
-                if [[ $file_name =~ "LICENSE" ]]; then \
-                  new=$(echo "$file_name" | sed -E "s/LICENSE\.[a-zA-Z0-9]{12}/LICENSE/"); \
-                else \
-                  new=$(echo "$file_name" | sed -E "s/\.[a-zA-Z0-9]{12}\./\./"); \
-                fi; \
-                mv -- "$file_name" "$new"; \
-           done \
-        && echo 'Successfully removed hash from pdfjs files'
+      && export PDFJS_PATH="pdfding/staticfiles/pdfjs" \
+      && for file_name in $(find $PDFJS_PATH -type f -not -path "$PDFJS_PATH/web/images/*");  \
+        do \
+          if [[ $file_name =~ "LICENSE" ]]; then \
+            new=$(echo "$file_name" | sed -E "s/LICENSE\.[a-zA-Z0-9]{12}/LICENSE/"); \
+          else \
+            new=$(echo "$file_name" | sed -E "s/\.[a-zA-Z0-9]{12}\./\./"); \
+          fi; \
+          mv -- "$file_name" "$new"; \
+        done \
+      && echo 'Successfully removed hash from pdfjs files'
 
     echo "VERSION = '${version}'" > pdfding/core/settings/version.py;
   '';
@@ -185,9 +186,9 @@ python.pkgs.buildPythonApplication rec {
   ];
 
   /*
-     fix two breaking tests by providing full out path
-     AssertionError: Calls not found
-     AssertionError: 'add_file_to_minio' does not contain all of ...
+    fix two breaking tests by providing full out path
+    AssertionError: Calls not found
+    AssertionError: 'add_file_to_minio' does not contain all of ...
   */
   preCheck = ''
     pushd pdfding || exit 1

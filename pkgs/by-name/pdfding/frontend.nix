@@ -29,7 +29,7 @@ stdenv.mkDerivation (finalAttrs: {
   # npm error Invalid package, must have name and version
   postPatch = ''
     ${lib.getExe jq} '. += { "name": "pdfding-frontend", "version": "${finalAttrs.version}" }' package.json \
-       | ${lib.getExe' moreutils "sponge"} package.json
+      | ${lib.getExe' moreutils "sponge"} package.json
   '';
 
   passthru = {
