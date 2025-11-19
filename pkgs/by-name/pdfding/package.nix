@@ -84,7 +84,7 @@ python.pkgs.buildPythonApplication rec {
   pyproject = true;
 
   patches = [
-    # ideally this could be merged upstream
+    # https://github.com/mrmn2/PdfDing/pull/202
     ./0001-fix-allow-overriding-data-directory.patch
   ];
 
@@ -216,7 +216,7 @@ python.pkgs.buildPythonApplication rec {
   ];
 
   passthru = {
-    updateScript = ""; # TODO custom update script maybe, for handling npmDeps hash
+    updateScript = ./update.sh;
     inherit frontend;
   };
 
