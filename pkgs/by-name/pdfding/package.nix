@@ -197,9 +197,9 @@ python.pkgs.buildPythonApplication rec {
   ];
 
   /*
-     fix two breaking tests by providing full out path
-     AssertionError: Calls not found
-     AssertionError: 'add_file_to_minio' does not contain all of ...
+    fix two breaking tests by providing full out path
+    AssertionError: Calls not found
+    AssertionError: 'add_file_to_minio' does not contain all of ...
   */
   preCheck = ''
     pushd pdfding || exit 1
