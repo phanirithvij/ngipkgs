@@ -1,4 +1,5 @@
 {
+  lib,
   sources,
   ...
 }:
@@ -14,12 +15,26 @@
           sources.modules.ngipkgs
           sources.modules.services.pdfding
           sources.examples.PdfDing.basic
+          sources.examples.PdfDing.minio
+          "${sources.inputs.sops-nix}/modules/sops"
         ];
+
+        sops = lib.mkForce {
+          age.keyFile = "/run/keys.txt";
+          defaultSopsFile = ./sops/pdfding.yaml;
+        };
+
+        # must run before sops sets up keys
+        boot.initrd.postDeviceCommands = ''
+          cp -r ${./sops/keys.txt} /run/keys.txt
+          chmod -R 700 /run/keys.txt
+        '';
+
+        services.pdfding.backup.enable = true;
       };
   };
 
-  # TODO
-  # Tests the most basic user functionality expected from pdfding
+  # Tests the most basic user functionality expected from pdfding backup service
   testScript =
     { nodes, ... }:
     # py

@@ -35,6 +35,7 @@ in
 
         environment.systemPackages = [ pkgs.pdfding ];
         services.pdfding.port = port;
+        services.pdfding.consume.enable = true;
 
         virtualisation.forwardPorts = map (port: {
           from = "host";
