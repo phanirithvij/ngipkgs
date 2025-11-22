@@ -58,12 +58,11 @@
   # Debug interactively with:
   # - nix run .#checks.x86_64-linux.projects/PdfDing/nixos/tests/basic.driverInteractive -L
   # - start_all() / run_tests()
-  interactive.sshBackdoor.enable = true; # ssh -o User=root vsock/3
+  interactive.sshBackdoor.enable = true; # ssh -o User=root vsock%3
   interactive.nodes.machine =
     { config, ... }:
     {
       imports = [
-
         # enable graphical session + users (alice, bob)
         "${sources.inputs.nixpkgs}/nixos/tests/common/x11.nix"
         "${sources.inputs.nixpkgs}/nixos/tests/common/user-account.nix"
@@ -77,9 +76,6 @@
         sysz
       ];
     };
-
-  extraPythonPackages = p: [
-  ];
 
   testScript =
     { nodes, ... }:

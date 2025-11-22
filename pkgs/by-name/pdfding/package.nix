@@ -197,10 +197,10 @@ python.pkgs.buildPythonApplication rec {
     AssertionError: 'add_file_to_minio' does not contain all of ...
   */
   preCheck = ''
-    pushd pdfding || exit 1
-
     # dev.py is required for tests, restore it
-    cp $src/pdfding/core/settings/dev.py $out/${python.sitePackages}/pdfding/core/settings/dev.py
+    mv dev.py.bak $out/${python.sitePackages}/pdfding/core/settings/dev.py
+
+    pushd pdfding || exit 1
 
     substituteInPlace backup/tests/test_management.py backup/tests/test_tasks.py \
       --replace-fail "Path(__file__).parents[2]" "Path('$out/${python.sitePackages}/pdfding')"
