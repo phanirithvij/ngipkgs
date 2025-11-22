@@ -25,32 +25,18 @@ args: {
       examples = {
         basic = {
           module = ./services/pdfding/examples/basic.nix;
-          # TODO email is being sent to /var/mail and pdfding logs it to console
-          # https://github.com/mrmn2/PdfDing/issues/110
-          # there is an smtp setup available, maybe need to test it manually outside of these tests
-          description = ''
-            Usage instructions
-
-            1. Copy the example and run it
-            2. Visit [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser
-            3. Signup to an account with a test email
-          '';
+          description = "Sqlite default service";
           tests.basic.module = import ./services/pdfding/tests/basic.nix args;
         };
         postgres = {
           module = ./services/pdfding/examples/postgres.nix;
-          description = ''TODO'';
+          description = "Postgres and consume feature";
           tests.postgres.module = import ./services/pdfding/tests/postgres.nix args;
         };
         minio = {
           module = ./services/pdfding/examples/minio.nix;
-          description = ''TODO'';
-          tests.postgres.module = import ./services/pdfding/tests/minio.nix args;
-        };
-        e2e = {
-          module = ./services/pdfding/examples/basic.nix;
-          description = ''TODO not an example, something like a nixosTest'';
-          tests.e2e.module = import ./services/pdfding/tests/e2e.nix args;
+          description = "Backup feature of pdfding";
+          tests.minio.module = import ./services/pdfding/tests/minio.nix args;
         };
       };
       links = {
@@ -62,6 +48,9 @@ args: {
     };
   };
 
+  # e2e not tied to an example
+  nixos.tests.e2e.module = import ./services/pdfding/tests/e2e.nix args;
+
   nixos.demo.vm = {
     module = ./demo/module.nix;
     module-demo = ./demo/module-demo.nix;
@@ -72,6 +61,6 @@ args: {
         '';
       }
     ];
-    tests.demo.module = import ./services/pdfding/tests/postgres.nix args;
+    tests.demo.module = import ./services/pdfding/tests/basic.nix args;
   };
 }

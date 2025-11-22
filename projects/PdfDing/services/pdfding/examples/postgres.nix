@@ -21,5 +21,15 @@
     database.createLocally = true;
     database.type = "postgres";
     database.passwordFile = config.sops.secrets."pdfding/database/password".path;
+    consume.enable = true;
+    extraEnvironment = {
+      # huey docs say not possible to go lower than 1 min
+      # https://huey.readthedocs.io/en/latest/api.html#crontab
+      CONSUME_SCHEDULE = "*/1 * * * *";
+    };
   };
+
+  # TODO email is being sent to /var/mail and pdfding logs it to console
+  # https://github.com/mrmn2/PdfDing/issues/110
+  # there is an smtp setup available, need to test it via running some smtpserver
 }

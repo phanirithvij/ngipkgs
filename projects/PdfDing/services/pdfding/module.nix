@@ -42,21 +42,22 @@ let
   }
   // optionalAttrs cfg.backup.enable {
     BACKUP_ENABLE = "TRUE";
+    BACKUP_ENDPOINT = null;
   }
   // cfg.extraEnvironment;
 
   envFile = pkgs.writeText "pdfding.env" (
     concatStringsSep "\n" (
-      mapAttrsToList (name: value: "${name}=${toString value}") (filterAttrs (n: v: v != "") envVars)
+      mapAttrsToList (name: value: "${name}=\"${toString value}\"") (filterAttrs (n: v: v != "") envVars)
     )
   );
 
-  loadCreds = ''
-    ${optionalString usePostgres ''
-      export POSTGRES_PASSWORD="$(<$CREDENTIALS_DIRECTORY/db_password)"
-    ''}
-    export SECRET_KEY="$(<$CREDENTIALS_DIRECTORY/secret_key)"
-  '';
+  loadCreds =
+    optionalString usePostgres
+      # bash
+      ''
+        export POSTGRES_PASSWORD="$(<$CREDENTIALS_DIRECTORY/db_password)"
+      '';
 
   secretRecommendation = "Consider using a secret managing scheme such as `agenix` or `sops-nix` to generate this file.";
 in
@@ -126,6 +127,12 @@ in
       description = "Additional environment variables";
     };
 
+    envFiles = mkOption {
+      type = types.listOf types.path;
+      description = "Environment variable files";
+      default = [ ];
+    };
+
     secretKeyFile = mkOption {
       type = types.path;
       default = null;
@@ -181,15 +188,6 @@ in
       };
     };
 
-    huey = {
-      enable = mkOption {
-        type = types.bool;
-        default = cfg.consume.enable || cfg.backup.enable;
-        description = "Enable Huey background task worker";
-        internal = true;
-      };
-    };
-
     consume = {
       enable = mkOption {
         type = types.bool;
@@ -217,7 +215,14 @@ in
         assertion = usePostgres -> cfg.database.passwordFile != null;
         message = "services.pdfding.database.passwordFile must be set when using PostgreSQL";
       }
+      {
+        assertion = cfg.backup.enable -> envVars.BACKUP_ENDPOINT != null;
+        message = "services.pdfding.extraEnvironment.BACKUP_ENDPOINT must be set when backup is enabled";
+      }
     ];
+
+    # TODO finalPackage
+    environment.systemPackages = [ ];
 
     users.users.${cfg.user} = {
       isSystemUser = true;
@@ -227,6 +232,11 @@ in
     };
 
     users.groups.${cfg.group} = { };
+
+    services.pdfding.envFiles = [
+      cfg.secretKeyFile
+      envFile
+    ];
 
     systemd.services.pdfding =
       let
@@ -269,11 +279,8 @@ in
             ${loadCreds}
             exec ${cfg.package}/bin/pdfding-start ${cfg.gunicorn.extraArgs}
           '';
-          EnvironmentFile = [ envFile ];
-          LoadCredential = [
-            "secret_key:${cfg.secretKeyFile}"
-          ]
-          ++ lib.optional usePostgres "db_password:${cfg.database.passwordFile}";
+          EnvironmentFile = cfg.envFiles;
+          LoadCredential = lib.optional usePostgres "db_password:${cfg.database.passwordFile}";
           NoNewPrivileges = true;
           PrivateTmp = true;
           PrivateDevices = true;
@@ -285,7 +292,7 @@ in
         };
       };
 
-    systemd.services.pdfding-huey = lib.mkIf cfg.huey.enable {
+    systemd.services.pdfding-huey = lib.mkIf (cfg.consume.enable || cfg.backup.enable) {
       description = "PdfDing Background Tasks (Huey)";
       after = [ "pdfding.service" ];
       wantedBy = [ "multi-user.target" ];
@@ -294,11 +301,8 @@ in
         User = cfg.user;
         Group = cfg.group;
         WorkingDirectory = cfg.dataDir;
-        EnvironmentFile = [ envFile ];
-        LoadCredential = [
-          "secret_key:${cfg.secretKeyFile}"
-        ]
-        ++ lib.optional usePostgres "db_password:${cfg.database.passwordFile}";
+        EnvironmentFile = cfg.envFiles;
+        LoadCredential = lib.optional usePostgres "db_password:${cfg.database.passwordFile}";
         ExecStart = pkgs.writeShellScript "exec-start" ''
           ${loadCreds}
           exec ${cfg.package}/bin/pdfding-manage run_huey;

@@ -32,24 +32,19 @@ in
           chmod -R 700 /run/keys.txt
         '';
 
-        environment.systemPackages = [ pkgs.pdfding ];
+        environment.systemPackages = with pkgs; [
+          pdfding
+          sqlite
+        ];
+
         services.pdfding.port = port;
-
-        virtualisation.forwardPorts = map (port: {
-          from = "host";
-          host.port = port;
-          guest.port = port;
-        }) [ port ];
-
-        # forwarded ports need to be accessible
-        networking.firewall.allowedTCPPorts = [ port ];
       };
   };
 
   # Debug interactively with:
   # - nix run .#checks.x86_64-linux.projects/PdfDing/nixos/tests/basic.driverInteractive -L
   # - start_all() / run_tests()
-  interactive.sshBackdoor.enable = true; # ssh -o User=root vsock/3
+  interactive.sshBackdoor.enable = true; # ssh -o User=root vsock%3
   interactive.nodes.machine =
     { config, ... }:
     {
@@ -59,24 +54,23 @@ in
         btop
         sysz
       ];
-    };
 
-  extraPythonPackages = p: [
-    p.requests
-    p.types-requests
-  ];
+      virtualisation.forwardPorts = map (port: {
+        from = "host";
+        host.port = port;
+        guest.port = port;
+      }) [ port ];
+
+      # forwarded ports need to be accessible
+      networking.firewall.allowedTCPPorts = [ port ];
+    };
 
   # Tests the most basic user functionality expected from pdfding
   # heavy e2e test suite is ran on e2e.nix
   testScript =
     { nodes, ... }:
-    let
-      endpoint = "http://localhost:${toString port}";
-    in
     # py
     ''
-      import requests
-
       # start
       start_all()
 
@@ -84,29 +78,49 @@ in
       machine.wait_for_unit("multi-user.target")
       machine.succeed("DJANGO_SUPERUSER_PASSWORD=test pdfding-manage createsuperuser --no-input --username admin --email root@localhost")
 
-      # create normal user via API?
-      s = requests.Session()
+      # login
+      cookie_jar = "/tmp/cookies.txt"
+      endpoint = "http://localhost:${toString port}"
+      machine.succeed(f"""
+        curl -f \
+          -X POST -c {cookie_jar} -b {cookie_jar} \
+          -d "csrfmiddlewaretoken=$(curl -f -c {cookie_jar} -s '{endpoint}/accountlogin/' | grep -oP 'name="csrfmiddlewaretoken" value="\\K[^"]+')" \
+          -d "login=root@localhost" \
+          -d "password=test" \
+          {endpoint}/accountlogin/
+      """)
 
-      # get the csrf token
-      r = s.get("${endpoint}/accountlogin/?next/pdf/")
-      csrf_token = r.text.split('name="csrfmiddlewaretoken" value="')[1].split('"')[0]
+      test_pdf = "${pkgs.pdfding.src}/pdfding/pdf/tests/data/dummy.pdf"
 
-      data = {
-        "csrfmiddlewaretoken": csrf_token,
-        "login": "root@localhost",
-        "password": "test",
-        "next": "/pdf/",
-      }
-      r = s.post("${endpoint}/accountlogin/", data=data)
-      assert r.status_code == 200, "Failed to authenticate"
+      # verify no pdfs exist in db
+      machine.succeed("sqlite3 /var/lib/pdfding/db/db.sqlite3 'SELECT COUNT(*) FROM pdf_pdf' | grep -q '^0$'")
 
-      # make sample pdf (could be any test file or valid pdf?)
-      # upload via API to user
-      # download via API to user
-      # https://github.com/mrmn2/PdfDing/blob/master/docs/guides.md#consumption-directory
-      # make user consume pdfs via admin
-      # test if user can access via API
+      # upload
+      machine.succeed(f"""
+        csrf_token=$(curl -f -b {cookie_jar} -c {cookie_jar} -s "{endpoint}/pdf/add" | grep -oP 'name="csrfmiddlewaretoken" value="\\K[^"]+')
+        curl -f \
+          -c {cookie_jar} -b {cookie_jar} \
+          -F "notes=" \
+          -F "tag_string=" \
+          -F "description=" \
+          -F "use_file_name=on" \
+          -F "name=test-upload" \
+          -F "file=@{test_pdf};type=application/pdf" \
+          -F "csrfmiddlewaretoken=$csrf_token" \
+          -H "Referer: {endpoint}/pdf/add" \
+          {endpoint}/pdf/add
+      """)
 
-      machine.succeed("ls")
+      # download
+      machine.succeed(f"""
+        pdf_id=$(curl -f -b {cookie_jar} -s "{endpoint}/pdf/" | grep -oP 'href="/pdf/view/\\K[^"]+' | head -1)
+        curl -f -b {cookie_jar} -o /tmp/downloaded.pdf "{endpoint}/pdf/download/$pdf_id"
+      """)
+
+      # verify pdf in user's dir
+      machine.succeed("test -f /var/lib/pdfding/media/1/pdf/*.pdf")
+
+      # verify one entry exists in sqlite db
+      machine.succeed("sqlite3 /var/lib/pdfding/db/db.sqlite3 'SELECT COUNT(*) FROM pdf_pdf' | grep -q '^1$'")
     '';
 }

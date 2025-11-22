@@ -95,6 +95,12 @@ python.pkgs.buildPythonApplication rec {
       url = "https://github.com/mrmn2/PdfDing/pull/203.patch?full_index=1";
       hash = "sha256-lKtpqKdyoGZdU4fTegto+YUIduIWbM82RQU9459NpC0=";
     })
+    # allow cusomising consume crontab
+    # follow https://github.com/mrmn2/PdfDing/pull/205
+    (fetchpatch2 {
+      url = "https://github.com/mrmn2/PdfDing/commit/091dd44ae49dcc73573ce318e9ee35b8218deb6f.patch?full_index=1";
+      hash = "sha256-Stq392rIbsphvaE23GgFWb91KzpD6aOQu9MGDDoaO7s=";
+    })
   ];
 
   inherit dependencies;
@@ -111,7 +117,7 @@ python.pkgs.buildPythonApplication rec {
     ln -s ${passthru.frontend}/pdfding/static pdfding/static
 
     # staticfiles step requires prod configuration, remove dev.py
-    rm pdfding/core/settings/dev.py
+    mv pdfding/core/settings/dev.py dev.py.bak
 
     ${python.pythonOnBuildForHost.interpreter} pdfding/manage.py collectstatic
 
@@ -194,10 +200,10 @@ python.pkgs.buildPythonApplication rec {
     AssertionError: 'add_file_to_minio' does not contain all of ...
   */
   preCheck = ''
-    pushd pdfding || exit 1
-
     # dev.py is required for tests, restore it
-    cp $src/pdfding/core/settings/dev.py $out/${python.sitePackages}/pdfding/core/settings/dev.py
+    mv dev.py.bak $out/${python.sitePackages}/pdfding/core/settings/dev.py
+
+    pushd pdfding || exit 1
 
     substituteInPlace backup/tests/test_management.py backup/tests/test_tasks.py \
       --replace-fail "Path(__file__).parents[2]" "Path('$out/${python.sitePackages}/pdfding')"
