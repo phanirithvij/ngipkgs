@@ -25,13 +25,7 @@ args: {
       examples = {
         basic = {
           module = ./services/pdfding/examples/basic.nix;
-          description = ''
-            Usage instructions
-
-            - Copy the example and run it
-            - Visit [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser
-            - Signup to an account with a test email
-          '';
+          description = "Sqlite default service";
           tests.basic.module = import ./services/pdfding/tests/basic.nix args;
         };
         postgres = {
@@ -44,11 +38,6 @@ args: {
           description = "Backup feature of pdfding";
           tests.minio.module = import ./services/pdfding/tests/minio.nix args;
         };
-        e2e = {
-          module = ./services/pdfding/examples/basic.nix;
-          description = "End to end tests of pdfding";
-          tests.e2e.module = import ./services/pdfding/tests/e2e.nix args;
-        };
       };
       links = {
         build = {
@@ -58,6 +47,9 @@ args: {
       };
     };
   };
+
+  # e2e not tied to an example
+  nixos.tests.e2e.module = import ./services/pdfding/tests/e2e.nix args;
 
   nixos.demo.vm = {
     module = ./demo/module.nix;
@@ -69,6 +61,6 @@ args: {
         '';
       }
     ];
-    tests.demo.module = import ./services/pdfding/tests/postgres.nix args;
+    tests.demo.module = import ./services/pdfding/tests/basic.nix args;
   };
 }

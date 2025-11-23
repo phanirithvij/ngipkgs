@@ -46,17 +46,10 @@
     envFiles = [ config.sops.templates."pdfding-minio-keys".path ];
   };
 
-  users.users.pdfding.extraGroups = [ "minio" ]; # allow reading creds
-
   services.minio = {
     enable = true;
     rootCredentialsFile = config.sops.templates."minio-creds".path;
     listenAddress = "127.0.0.1:9000";
     consoleAddress = "127.0.0.1:9001";
   };
-
-  networking.firewall.allowedTCPPorts = [
-    9000
-    9001
-  ];
 }

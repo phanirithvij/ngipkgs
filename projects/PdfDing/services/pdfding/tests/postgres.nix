@@ -17,7 +17,6 @@ in
         imports = [
           sources.modules.ngipkgs
           sources.modules.services.pdfding
-          sources.examples.PdfDing.basic
           sources.examples.PdfDing.postgres
           "${sources.inputs.sops-nix}/modules/sops"
         ];
