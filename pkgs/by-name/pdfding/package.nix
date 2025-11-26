@@ -39,33 +39,37 @@ let
     };
   };
 
-  dependencies = with python.pkgs; [
-    django
-    django-allauth
-    django-cleanup
-    django-htmx
-    gunicorn
-    markdown
-    minio
-    nh3
-    psycopg2-binary
-    pypdf
-    pypdfium2
-    python-magic
-    qrcode
-    rapidfuzz
-    ruamel-yaml
-    whitenoise
-    huey
-    supervisor # required but not used by the module, using systemd instead
-    pillow
-    oauthlib
+  dependencies =
+    with python.pkgs;
+    [
+      django
+      django-allauth
+      django-cleanup
+      django-htmx
+      gunicorn
+      markdown
+      minio
+      nh3
+      psycopg2-binary
+      pypdf
+      pypdfium2
+      python-magic
+      qrcode
+      rapidfuzz
+      ruamel-yaml
+      whitenoise
+      huey
+      supervisor # required but not used by the module, using systemd instead
+      pillow
+      oauthlib
 
-    # dependecies required for django collectstatic
-    requests
-    pyjwt
-    cryptography
-  ];
+      # dependecies required for django collectstatic
+      requests
+      pyjwt
+      cryptography
+    ]
+    ++ qrcode.optional-dependencies.pil
+    ++ django-allauth.optional-dependencies.socialaccount;
 
   frontend = callPackage ./frontend.nix { };
 in
