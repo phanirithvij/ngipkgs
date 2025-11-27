@@ -6,7 +6,7 @@
 }@args:
 {
   metadata = {
-    summary = "Webbased selfhosted PDF manager, viewer and editor";
+    summary = "Web-based selfhosted PDF manager, viewer and editor";
     subgrants.Commons = [
       "PdfDing"
     ];
@@ -65,6 +65,24 @@
       {
         instruction = ''
           Visit [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser
+        '';
+      }
+      {
+        instruction = ''
+          An admin account has already been created inside the demo, so you can sign in with the following credentials:
+
+          - email: `admin@localhost`
+          - password: `admin`
+        '';
+      }
+      {
+        instruction = ''
+          An example file will be available inside the demo, but it might take a minute for it to appear.
+          You can upload more PDFs, click ➕ icon (top right corner).
+
+          For example:
+          - [https://nix.dev/nix-dev.pdf](https://nix.dev/nix-dev.pdf)
+          - [https://edolstra.github.io/pubs/phd-thesis.pdf](https://edolstra.github.io/pubs/phd-thesis.pdf)
         '';
       }
     ];
