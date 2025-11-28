@@ -7,9 +7,7 @@
 {
   metadata = {
     summary = "Web-based selfhosted PDF manager, viewer and editor";
-    subgrants.Commons = [
-      "PdfDing"
-    ];
+    subgrants.Commons = [ "PdfDing" ];
     links = {
       repo = {
         text = "Source repository";
