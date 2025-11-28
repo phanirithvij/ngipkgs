@@ -6,12 +6,8 @@
     database.createLocally = true;
     database.type = "postgres";
     database.passwordFile = config.sops.secrets."pdfding/database/password".path;
-    consume.enable = true;
-    extraEnvironment = {
-      # huey docs say not possible to go lower than 1 min
-      # https://huey.readthedocs.io/en/latest/api.html#crontab
-      CONSUME_SCHEDULE = "*/1 * * * *";
-    };
+    consume.enable = true; # allows bulk importing pdf files from the backend
+    consume.schedule = "*/1 * * * *"; # once every minute
   };
 
   # Secrets management
