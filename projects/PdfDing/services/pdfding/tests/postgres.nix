@@ -51,8 +51,7 @@
       # create admin
       machine.wait_for_unit("multi-user.target")
 
-      #print(machine.succeed("realpath $(which pdfding-manage)"))
-      machine.succeed("pdfding-manage createsuperuser --no-input --username admin --email root@localhost")
+      machine.succeed("DJANGO_SUPERUSER_PASSWORD=admin pdfding-manage createsuperuser --no-input --username admin --email admin@localhost")
 
       test_pdf = "${pkgs.pdfding.src}/pdfding/pdf/tests/data/dummy.pdf"
 

@@ -49,12 +49,12 @@
     in
     # py
     ''
-      # start
+      # start vms
       start_all()
 
       # create admin
       machine.wait_for_unit("multi-user.target")
-      machine.succeed("DJANGO_SUPERUSER_PASSWORD=test pdfding-manage createsuperuser --no-input --username admin --email root@localhost")
+      machine.succeed("DJANGO_SUPERUSER_PASSWORD=admin pdfding-manage createsuperuser --no-input --username admin --email admin@localhost")
 
       # login
       endpoint = "http://localhost:${toString port}"
@@ -63,8 +63,8 @@
         curl -f \
           -X POST -c {cookie_jar} -b {cookie_jar} \
           -d "csrfmiddlewaretoken=$(curl -f -c {cookie_jar} -s '{endpoint}/accountlogin/' | grep -oP 'name="csrfmiddlewaretoken" value="\\K[^"]+')" \
-          -d "login=root@localhost" \
-          -d "password=test" \
+          -d "login=admin@localhost" \
+          -d "password=admin" \
           {endpoint}/accountlogin/
       """)
 

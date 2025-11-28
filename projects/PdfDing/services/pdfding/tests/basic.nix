@@ -70,87 +70,88 @@
       import json
       from pprint import pprint
 
-      # start
+      # start vms
       start_all()
 
       # create admin
       machine.wait_for_unit("multi-user.target")
-      machine.succeed("DJANGO_SUPERUSER_PASSWORD=test pdfding-manage createsuperuser --no-input --username admin --email root@localhost")
+      machine.succeed("DJANGO_SUPERUSER_PASSWORD=admin pdfding-manage createsuperuser --no-input --username admin --email admin@localhost")
 
-      # login
       cookie_jar = "/tmp/cookies.txt"
       endpoint = "http://localhost:${toString port}"
-      machine.succeed(f"""
-        curl -f \
-          -X POST -c {cookie_jar} -b {cookie_jar} \
-          -d "csrfmiddlewaretoken=$(curl -f -c {cookie_jar} -s '{endpoint}/accountlogin/' | grep -oP 'name="csrfmiddlewaretoken" value="\\K[^"]+')" \
-          -d "login=root@localhost" \
-          -d "password=test" \
-          {endpoint}/accountlogin/
-      """)
 
-      test_pdf = "${pkgs.pdfding.src}/pdfding/pdf/tests/data/dummy.pdf"
+      with subtest("login and basic usage"):
+        # login
+        machine.succeed(f"""
+          curl -f \
+            -X POST -c {cookie_jar} -b {cookie_jar} \
+            -d "csrfmiddlewaretoken=$(curl -f -c {cookie_jar} -s '{endpoint}/accountlogin/' | grep -oP 'name="csrfmiddlewaretoken" value="\\K[^"]+')" \
+            -d "login=admin@localhost" \
+            -d "password=admin" \
+            {endpoint}/accountlogin/
+        """)
 
-      # verify no pdfs exist in db
-      machine.succeed("sqlite3 ${dataDir}/db/db.sqlite3 'SELECT COUNT(*) FROM pdf_pdf' | grep -q '^0$'")
+        test_pdf = "${pkgs.pdfding.src}/pdfding/pdf/tests/data/dummy.pdf"
 
-      # upload
-      machine.succeed(f"""
-        csrf_token=$(curl -f -b {cookie_jar} -c {cookie_jar} -s "{endpoint}/pdf/add" | grep -oP 'name="csrfmiddlewaretoken" value="\\K[^"]+')
-        curl -f \
-          -c {cookie_jar} -b {cookie_jar} \
-          -F "notes=" \
-          -F "tag_string=" \
-          -F "description=" \
-          -F "use_file_name=on" \
-          -F "name=test-upload" \
-          -F "file=@{test_pdf};type=application/pdf" \
-          -F "csrfmiddlewaretoken=$csrf_token" \
-          -H "Referer: {endpoint}/pdf/add" \
-          {endpoint}/pdf/add
-      """)
+        # verify no pdfs exist in db
+        machine.succeed("sqlite3 ${dataDir}/db/db.sqlite3 'SELECT COUNT(*) FROM pdf_pdf' | grep -q '^0$'")
 
-      # download
-      machine.succeed(f"""
-        pdf_id=$(curl -f -b {cookie_jar} -s "{endpoint}/pdf/" | grep -oP 'href="/pdf/view/\\K[^"]+' | head -1)
-        curl -f -b {cookie_jar} -o /tmp/downloaded.pdf "{endpoint}/pdf/download/$pdf_id"
-      """)
+        # upload
+        machine.succeed(f"""
+          csrf_token=$(curl -f -b {cookie_jar} -c {cookie_jar} -s "{endpoint}/pdf/add" | grep -oP 'name="csrfmiddlewaretoken" value="\\K[^"]+')
+          curl -f \
+            -c {cookie_jar} -b {cookie_jar} \
+            -F "notes=" \
+            -F "tag_string=" \
+            -F "description=" \
+            -F "use_file_name=on" \
+            -F "name=test-upload" \
+            -F "file=@{test_pdf};type=application/pdf" \
+            -F "csrfmiddlewaretoken=$csrf_token" \
+            -H "Referer: {endpoint}/pdf/add" \
+            {endpoint}/pdf/add
+        """)
 
-      # verify pdf in user's dir
-      machine.succeed("test -f ${dataDir}/media/1/pdf/*.pdf")
+        # download
+        machine.succeed(f"""
+          pdf_id=$(curl -f -b {cookie_jar} -s "{endpoint}/pdf/" | grep -oP 'href="/pdf/view/\\K[^"]+' | head -1)
+          curl -f -b {cookie_jar} -o /tmp/downloaded.pdf "{endpoint}/pdf/download/$pdf_id"
+        """)
 
-      # verify one entry exists in sqlite db
-      machine.succeed("sqlite3 ${dataDir}/db/db.sqlite3 'SELECT COUNT(*) FROM pdf_pdf' | grep -q '^1$'")
+        # verify pdf in user's dir
+        machine.succeed("test -f ${dataDir}/media/1/pdf/*.pdf")
 
-      # email validation
+        # verify one entry exists in sqlite db
+        machine.succeed("sqlite3 ${dataDir}/db/db.sqlite3 'SELECT COUNT(*) FROM pdf_pdf' | grep -q '^1$'")
 
-      # check we can reach mailpit
-      machine.succeed("curl -f ${mailpitApiEndpoint}/info")
+      with subtest("email validation"):
+        # check we can reach mailpit
+        machine.succeed("curl -f ${mailpitApiEndpoint}/info")
 
-      # check that no emails exist
-      result = json.loads(machine.succeed("curl -sf ${mailpitApiEndpoint}/messages"))
-      pprint(result)
-      assert result["total"] == 0
+        # check that no emails exist
+        result = json.loads(machine.succeed("curl -sf ${mailpitApiEndpoint}/messages"))
+        pprint(result)
+        assert result["total"] == 0
 
-      # signup
-      machine.succeed(f"""
-        curl -f \
-          -X POST -c {cookie_jar} -b {cookie_jar} \
-          -d "csrfmiddlewaretoken=$(curl -f -c {cookie_jar} -s '{endpoint}/accountsignup/' | grep -oP 'name="csrfmiddlewaretoken" value="\\K[^"]+')" \
-          -d "email=pdfding_new_user@example.com" \
-          -d "password1=foobarbaz" \
-          -d "password2=foobarbaz" \
-          {endpoint}/accountsignup/
-      """)
+        # signup
+        machine.succeed(f"""
+          curl -f \
+            -X POST -c {cookie_jar} -b {cookie_jar} \
+            -d "csrfmiddlewaretoken=$(curl -f -c {cookie_jar} -s '{endpoint}/accountsignup/' | grep -oP 'name="csrfmiddlewaretoken" value="\\K[^"]+')" \
+            -d "email=pdfding_new_user@example.com" \
+            -d "password1=foobarbaz" \
+            -d "password2=foobarbaz" \
+            {endpoint}/accountsignup/
+        """)
 
-      # wait a bit
-      machine.sleep(3)
+        # wait a bit
+        machine.sleep(3)
 
-      # verify the email was received by mailpit
-      result = json.loads(machine.succeed("curl -s ${mailpitApiEndpoint}/messages"))
-      pprint(result)
-      assert result["total"] == 1
-      assert result["messages"][0]["To"][0]["Address"] == "pdfding_new_user@example.com"
+        # verify the email was received by mailpit
+        result = json.loads(machine.succeed("curl -s ${mailpitApiEndpoint}/messages"))
+        pprint(result)
+        assert result["total"] == 1
+        assert result["messages"][0]["To"][0]["Address"] == "pdfding_new_user@example.com"
     '';
 
   # Debug interactively with:
