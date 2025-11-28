@@ -38,10 +38,12 @@ let
   }
   // optionalAttrs cfg.consume.enable {
     CONSUME_ENABLE = "TRUE";
+    CONSUME_SCHEDULE = cfg.consume.schedule;
   }
   // optionalAttrs cfg.backup.enable {
     BACKUP_ENABLE = "TRUE";
-    BACKUP_ENDPOINT = null;
+    BACKUP_ENDPOINT = cfg.backup.endpoint;
+    BACKUP_SCHEDULE = cfg.backup.schedule;
   }
   // cfg.extraEnvironment;
 
@@ -197,38 +199,71 @@ in
       };
     };
 
-    consume.enable = mkOption {
-      type = types.bool;
-      default = false;
-      description = ''
-        Bulk PDF import from consume directory.
+    consume = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Bulk PDF import from consume directory.
 
-        When enabled, administrators can create per-user directories like /var/lib/pdfding/consume/<user_id>
-        with permissions allowing the pdfding user to read and write.
-        PDFs placed in these directories are automatically imported into user accounts.
+          When enabled, administrators can create per-user directories like /var/lib/pdfding/consume/<user_id>
+          with permissions allowing the pdfding user to read and write.
+          PDFs placed in these directories are automatically imported into user accounts.
 
-        PDFs are imported periodically via cronjob and successfully imported files
-        are automatically deleted from the consume directory.
-      '';
+          PDFs are imported periodically via cronjob and successfully imported files
+          are automatically deleted from the consume directory.
+        '';
+      };
+      schedule = mkOption {
+        type = types.str;
+        default = "*/5 * * * *";
+        description = ''
+          The cron schedule for the consume task to trigger.
+          The format is "minute hour day month day_of_week"
+          Read
+            - https://github.com/mrmn2/PdfDing/blob/d0f21ec2f9fbee4b1a2f6b7e0e6c7ea7784ab1bc/pdfding/base/task_helpers.py#L5
+            - https://huey.readthedocs.io/en/latest/api.html#crontab
+        '';
+      };
     };
 
-    backup.enable = mkOption {
-      type = types.bool;
-      default = false;
-      description = ''
-        Automatic backup of important data to a MinIO instance.
+    backup = {
+      enable = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Automatic backup of important data to a MinIO instance.
 
-        When enabled and properly configured via environment variables,
-        important data is periodically uploaded to the specified MinIO
-        instance via cronjob.
-      '';
+          When enabled and properly configured via environment variables,
+          important data is periodically uploaded to the specified MinIO
+          instance via cronjob.
+        '';
+      };
+      schedule = mkOption {
+        type = types.str;
+        default = "0 2 * * *";
+        description = ''
+          The cron schedule for the consume task to trigger.
+          The format is "minute hour day month day_of_week"
+          Read
+            - https://github.com/mrmn2/PdfDing/blob/d0f21ec2f9fbee4b1a2f6b7e0e6c7ea7784ab1bc/pdfding/base/task_helpers.py#L5
+            - https://huey.readthedocs.io/en/latest/api.html#crontab
+        '';
+      };
+      endpoint = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "The Minio endpoint for backups";
+        example = "127.0.0.1:9000";
+      };
     };
 
     installWrapper = mkOption {
       type = types.bool;
-      default = true;
+      default = false;
       description = ''
-        This will add pdfding-manage admin cli to environment.systemPackages
+        This will add pdfding-manage django admin cli with proper credentials configured
+        to environment.systemPackages
       '';
     };
 
@@ -252,6 +287,10 @@ in
       {
         assertion = cfg.backup.enable -> envVars.BACKUP_ENDPOINT != null;
         message = "services.pdfding.extraEnvironment.BACKUP_ENDPOINT must be set when backup is enabled";
+      }
+      {
+        assertion = cfg.database.createLocally -> usePostgres;
+        message = "services.pdfding.database.createLocally is enabled but not database.type is not postgres";
       }
     ];
 
@@ -284,61 +323,54 @@ in
 
     services.pdfding.envFiles = [ envFile ];
 
-    systemd.services.pdfding =
-      let
-        databaseServices =
-          (optional usePostgres "postgresql.target")
-          ++ (optional cfg.database.createLocally "pdfdingPostgreSQLInit.service");
-      in
-      {
-        description = "PdfDing Web Service";
-        after = [
-          "network.target"
-        ]
-        ++ databaseServices;
-        bindsTo = databaseServices;
-        wantedBy = [ "multi-user.target" ];
+    systemd.services.pdfding = {
+      description = "PdfDing Web Service";
+      after = [ "network.target" ];
+      bindsTo =
+        (optional usePostgres "postgresql.target")
+        ++ (optional cfg.database.createLocally "pdfdingPostgreSQLInit.service");
+      wantedBy = [ "multi-user.target" ];
 
-        preStart = ''
+      preStart = ''
+        ${loadCreds}
+        ${optionalString usePostgres
+          # bash
+          ''
+            until ${pkgs.postgresql}/bin/pg_isready -h ${cfg.database.host} -p ${toString cfg.database.port}; do
+              echo "Waiting for PostgreSQL..."
+              sleep 1
+            done
+          ''
+        }
+        mkdir -p ${cfg.dataDir}/{db,media}
+
+        ${optionalString cfg.consume.enable ''
+          mkdir -p ${cfg.dataDir}/consume
+        ''}
+
+        ${cfg.package}/bin/pdfding-manage migrate
+        ${cfg.package}/bin/pdfding-manage clean_up
+      '';
+
+      serviceConfig = {
+        Type = "exec";
+        User = cfg.user;
+        Group = cfg.group;
+        ExecStart = pkgs.writeShellScript "exec-start" ''
           ${loadCreds}
-          ${optionalString usePostgres
-            # bash
-            ''
-              until ${pkgs.postgresql}/bin/pg_isready -h ${cfg.database.host} -p ${toString cfg.database.port}; do
-                echo "Waiting for PostgreSQL..."
-                sleep 1
-              done
-            ''
-          }
-          mkdir -p ${cfg.dataDir}/{db,media}
-
-          ${optionalString cfg.consume.enable ''
-            mkdir -p ${cfg.dataDir}/consume
-          ''}
-
-          ${cfg.package}/bin/pdfding-manage migrate
-          ${cfg.package}/bin/pdfding-manage clean_up
+          exec ${cfg.package}/bin/pdfding-start ${builtins.toString cfg.gunicorn.extraArgs}
         '';
-
-        serviceConfig = {
-          Type = "exec";
-          User = cfg.user;
-          Group = cfg.group;
-          ExecStart = pkgs.writeShellScript "exec-start" ''
-            ${loadCreds}
-            exec ${cfg.package}/bin/pdfding-start ${builtins.toString cfg.gunicorn.extraArgs}
-          '';
-          EnvironmentFile = cfg.envFiles;
-          NoNewPrivileges = true;
-          PrivateTmp = true;
-          PrivateDevices = true;
-          ProtectSystem = "strict";
-          ProtectHome = true;
-          ReadWritePaths = [ cfg.dataDir ];
-          Restart = "on-failure";
-          RestartSec = "5s";
-        };
+        EnvironmentFile = cfg.envFiles;
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+        PrivateDevices = true;
+        ProtectSystem = "strict";
+        ProtectHome = true;
+        ReadWritePaths = [ cfg.dataDir ];
+        Restart = "on-failure";
+        RestartSec = "5s";
       };
+    };
 
     systemd.services.pdfding-background = lib.mkIf (cfg.consume.enable || cfg.backup.enable) {
       description = "PdfDing Background Tasks (Huey)";
