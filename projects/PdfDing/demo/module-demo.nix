@@ -15,7 +15,6 @@ in
       echo "PdfDing is ready at http://localhost:${toString cfg.port}"
     '';
 
-    services.pdfding.consume.enable = true; # bulk-import files
     services.pdfding.installWrapper = true;
 
     systemd.services.pdfding.path = [ pkgs.sqlite ];
@@ -34,9 +33,6 @@ in
         "UPDATE users_profile SET layout = 'Grid' WHERE layout = 'Compact';"
     '';
 
-    # huey docs say not possible to go lower than 1 min
-    # https://huey.readthedocs.io/en/latest/api.html#crontab
-    services.pdfding.extraEnvironment.CONSUME_SCHEDULE = "*/1 * * * *";
     systemd.services.pdfding-background.postStart = ''
       # copy example file to consume it
       install -D \
