@@ -4,16 +4,14 @@
     enable = true;
     secretKeyFile = config.sops.secrets."pdfding/django/secret_key".path;
     backup.enable = true;
-    extraEnvironment = {
-      # huey docs say not possible to go lower than 1 min
-      # https://huey.readthedocs.io/en/latest/api.html#crontab
-      BACKUP_SCHEDULE = "*/1 * * * *";
-      BACKUP_ENDPOINT = "127.0.0.1:9000";
-    };
+    backup.schedule = "*/1 * * * *";
+    backup.endpoint = "127.0.0.1:9000";
     envFiles = [ config.sops.templates."pdfding-minio-keys".path ];
+    # adds pdfding-manage django admin executable to path
     installWrapper = true;
   };
 
+  # Setup a local minio service for the backup feature
   services.minio = {
     enable = true;
     rootCredentialsFile = config.sops.templates."minio-creds".path;
