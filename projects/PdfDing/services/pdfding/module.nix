@@ -258,6 +258,12 @@ in
       };
     };
 
+    openFirewall = lib.mkOption {
+      type = types.bool;
+      default = false;
+      description = "Open ports in the firewall for the PdfDing web interface.";
+    };
+
     installWrapper = mkOption {
       type = types.bool;
       default = false;
@@ -267,10 +273,11 @@ in
       '';
     };
 
-    openFirewall = lib.mkOption {
+    installTestHelpers = mkOption {
       type = types.bool;
       default = false;
-      description = "Open ports in the firewall for the PdfDing web interface.";
+      internal = true;
+      description = "Adds a few helper commands to systemPackages for nixos tests";
     };
   };
 
@@ -300,17 +307,34 @@ in
 
     environment.systemPackages =
       let
-        pdfding-manage = pkgs.writeShellScriptBin "pdfding-manage" ''
-          set -eou pipefail
-          set -a
-          ${lib.toShellVars cfg.extraEnvironment}
-          ${lib.concatMapStringsSep "\n" (f: "source ${f}") cfg.envFiles}
-          set +a
-          ${loadCreds}
+        genWrapper =
+          name: cmd:
+          pkgs.writeShellScriptBin name ''
+            set -eou pipefail
+            set -a
+            ${lib.toShellVars cfg.extraEnvironment}
+            ${lib.concatMapStringsSep "\n" (f: "source ${f}") cfg.envFiles}
+            set +a
+            ${loadCreds}
+            ${cmd}
+          '';
+        pdfding-manage = genWrapper "pdfding-manage" ''
           ${config.security.wrapperDir}/sudo -E -u ${cfg.user} ${lib.getExe cfg.package} "$@"
         '';
+        consume-immediate = genWrapper "consume-immediate" ''
+          echo "from pdf.tasks import consume_function; consume_function(True)" | \
+            ${config.security.wrapperDir}/sudo -E -u ${cfg.user} ${lib.getExe cfg.package} shell
+        '';
+        backup-immediate = genWrapper "backup-immediate" ''
+          echo "from backup.tasks import backup_function; backup_function()" | \
+            ${config.security.wrapperDir}/sudo -E -u ${cfg.user} ${lib.getExe cfg.package} shell
+        '';
       in
-      lib.optionals cfg.installWrapper [ pdfding-manage ];
+      lib.optionals cfg.installWrapper [ pdfding-manage ]
+      ++ lib.optionals cfg.installTestHelpers [
+        consume-immediate
+        backup-immediate
+      ];
 
     users.users.${cfg.user} = {
       isSystemUser = true;
