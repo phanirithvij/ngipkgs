@@ -178,50 +178,6 @@ python.pkgs.buildPythonPackage rec {
     ];
   */
 
-  nativeCheckInputs = with python.pkgs; [
-    pytest-cov-stub
-    pytest-django
-    pytestCheckHook
-  ];
-
-  #TODO disable this for quick iteration as well
-  #doCheck = false;
-
-  # from .github/workflows/tests.yaml
-  pytestFlags = [
-    "--ignore=e2e"
-    "--cov=admin"
-    "--cov=backup"
-    "--cov=base"
-    "--cov=pdf"
-    "--cov=users"
-    "--cov-fail-under=100"
-  ];
-
-  /*
-    fix two breaking tests by providing full out path
-    AssertionError: Calls not found
-    AssertionError: 'add_file_to_minio' does not contain all of ...
-  */
-  preCheck = ''
-    # dev.py is required for tests, restore it
-    mv dev.py.bak $out/${python.sitePackages}/pdfding/core/settings/dev.py
-
-    pushd pdfding || exit 1
-
-    substituteInPlace backup/tests/test_management.py backup/tests/test_tasks.py \
-      --replace-fail "Path(__file__).parents[2]" "Path('$out/${python.sitePackages}/pdfding')"
-  '';
-
-  postCheck = ''
-    popd || exit 1
-
-    # remove dev.py
-    rm $out/${python.sitePackages}/pdfding/core/settings/dev.py
-  '';
-
-  # enabledTestPaths = [ "backup/" ]; # TODO remove once fixed/disabled, added for quick iteration
-
   pythonImportsCheck = [
     "pdfding"
   ];
