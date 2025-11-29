@@ -144,7 +144,7 @@
             {endpoint}/accountsignup/
         """)
 
-        # wait a bit
+        # wait a bit for email to be processed
         machine.sleep(3)
 
         # verify the email was received by mailpit

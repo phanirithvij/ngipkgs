@@ -35,6 +35,7 @@
         ];
 
         services.pdfding.installWrapper = true;
+        services.pdfding.installTestHelpers = true;
       };
   };
 
@@ -103,7 +104,9 @@
         mc alias set local http://127.0.0.1:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD
       """)
 
-      machine.sleep(64)
+      print(machine.succeed("realpath /run/current-system/sw/bin/backup-immediate"))
+      print(machine.succeed("backup-immediate"))
+      machine.sleep(5)
 
       # verify minio has that pdf file
       machine.succeed("mc stat local/pdfding/1/pdf/dummy.pdf")
