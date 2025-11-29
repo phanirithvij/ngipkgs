@@ -16,6 +16,7 @@ in
     '';
 
     services.pdfding.installWrapper = true;
+    services.pdfding.installTestHelpers = true;
 
     systemd.services.pdfding.path = [ pkgs.sqlite ];
     systemd.services.pdfding.postStart = ''
@@ -38,6 +39,8 @@ in
       install -D \
         ${pkgs.pdfding.src}/pdfding/pdf/tests/data/dummy.pdf \
         ${cfg.dataDir}/consume/1/example.pdf
+
+      consume-immediate
     '';
   };
 }
