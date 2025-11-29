@@ -34,6 +34,7 @@
         ];
 
         services.pdfding.installWrapper = true;
+        services.pdfding.installTestHelpers = true;
       };
   };
 
@@ -61,8 +62,9 @@
       # check there are no pdfs
       machine.succeed("sudo -u pdfding psql -tAc 'SELECT COUNT(*) FROM pdf_pdf' | grep -q '^0$'")
 
-      # wait one min (can it be made immediate?)
-      machine.sleep(64)
+      print(machine.succeed("realpath /run/current-system/sw/bin/consume-immediate"))
+      print(machine.succeed("consume-immediate"))
+      machine.sleep(4)
 
       # verify pdf is in user's dir, and removed from consume dir
       machine.succeed("test -f ${dataDir}/media/1/pdf/dummy.pdf")
