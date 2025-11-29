@@ -74,7 +74,7 @@ let
   frontend = callPackage ./frontend.nix { };
 in
 
-python.pkgs.buildPythonApplication rec {
+python.pkgs.buildPythonPackage rec {
   pname = "pdfding";
   version = "1.4.1";
   src = fetchFromGitHub {
