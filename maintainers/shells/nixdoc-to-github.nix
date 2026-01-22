@@ -3,66 +3,58 @@
   lib,
   busybox,
   gnused,
-  runCommand,
   stdenv,
   writeShellScriptBin,
-  writeText,
-
   nixdoc-to-github,
 }:
 let
-  getName = file: builtins.head (lib.splitString "." (builtins.baseNameOf file));
-  mkDocPart =
-    file:
-    nixdoc-to-github.lib.nixdoc-to-github.run {
-      description = "\\\`lib.${getName file}\\\`";
-      category = "";
-      inherit file; # copied to store
-      output = "\${out:-}";
-    };
-  docPart =
-    file:
-    runCommand "docpart-${getName file}"
-      {
-        nativeBuildInputs = if stdenv.isDarwin then [ gnused ] else [ busybox ];
-      }
-      ''
-        source ${lib.getExe (mkDocPart file)}
+  genericRunner = nixdoc-to-github.lib.nixdoc-to-github.run {
+    description = "PLACEHOLDER_DESC";
+    category = "";
+    file = "PLACEHOLDER_FILE";
+    output = "PLACEHOLDER_OUTFILE";
+  };
 
-        # remove a lib.default header
-        sed -i 's/^# `lib.default`$//g' $out
+  template = lib.getExe genericRunner;
 
-        # decrease h2 to h3
-        sed -i 's/^## .*$/#&/g' $out
+  cmd = writeShellScriptBin "nixdoc-to-github" ''
+    export PATH="${lib.makeBinPath (if stdenv.isDarwin then [ gnused ] else [ busybox ])}:$PATH"
+    outFile="${toString ../docs/project.md}"
 
-        # decrease h1 to h2
-        sed -i 's/^# `lib.*$/#&\n/g' $out
+    echo "# NGI Project Types" > "$outFile"
 
-        # remove extra newline at the end
-        head -c -1 $out >tmp && mv tmp $out
-      '';
-  cmd =
-    let
-      files = [
-        "default.nix"
-        "project.nix"
-        "metadata.nix"
-        "subgrant.nix"
-        "link.nix"
-        "binary.nix"
-        "module.nix"
-        "example.nix"
-        "demo.nix"
-        "test.nix"
-      ];
-    in
-    writeShellScriptBin "nixdoc-to-github" ''
-      outFile="${toString ../docs/project.md}"
-      echo "# NGI Project Types" >"$outFile"
-      ${lib.concatStringsSep "\n" (
-        lib.map (file: "cat ${docPart ../types/${file}} >>\"$outFile\"") files
-      )}
-    '';
+    files=(
+      "default.nix"
+      "project.nix"
+      "metadata.nix"
+      "subgrant.nix"
+      "link.nix"
+      "binary.nix"
+      "module.nix"
+      "example.nix"
+      "demo.nix"
+      "test.nix"
+    )
+
+    for f in "''${files[@]}"; do
+      name="''${f%.*}"
+      real_path="${toString ../types}/$f"
+      desc="\\\\\`lib.$name\\\\\`"
+
+      cat "${template}" \
+        | sed "s|PLACEHOLDER_FILE|$real_path|g" \
+        | sed "s|PLACEHOLDER_DESC|$desc|g" \
+        | sed "s|PLACEHOLDER_OUTFILE|/dev/stdout|g" \
+        | bash \
+        | sed 's/^# `lib.default`$//g' \
+        | sed 's/^## .*$/#&/g' \
+        | sed 's/^# `lib.*$/#&\n/g' \
+        >> "$outFile"
+
+      # remove the extra new line at the end
+      head -c -1 "$outFile" >tmp && mv tmp "$outFile"
+    done
+  '';
 in
 cmd.overrideAttrs {
   meta.description = "convert nixdoc output to GitHub markdown";
