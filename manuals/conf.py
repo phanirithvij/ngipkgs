@@ -130,7 +130,7 @@ todo_include_todos = True
 
 # -- Options for HTML output ----------------------------------------------
 
-html_baseurl = "https://ngi.nixos.org/manuals/"
+html_baseurl = "https://phanirithvij.github.io/ngipkgs/manuals/"
 
 html_theme = "sphinx_book_theme"
 

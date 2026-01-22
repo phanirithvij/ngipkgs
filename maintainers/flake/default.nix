@@ -41,10 +41,10 @@ in
 
       # Combined overview and html manual
       overview-with-manual = pkgs.runCommand "overview-with-manual" { } ''
-        mkdir -p $out
-        cp -r ${default.overview}/* $out/
-        mkdir -p $out/manual
-        cp -r ${default.manuals.html}/* $out/manual/
+        mkdir -p $out/ngipkgs/
+        cp -r ${default.overview}/* $out/ngipkgs/
+        mkdir -p $out/ngipkgs/manual
+        cp -r ${default.manuals.html}/* $out/ngipkgs/manual/
       '';
 
       # Configuration options in JSON

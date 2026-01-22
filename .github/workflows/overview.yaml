@@ -20,7 +20,6 @@ jobs:
         with: { path: 'result' }
 
   deploy:
-    if: github.repository_owner == 'ngi-nix'
     needs: build
     runs-on: ubuntu-latest
     permissions:
