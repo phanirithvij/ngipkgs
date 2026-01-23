@@ -1,8 +1,5 @@
- deps.edn | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
 diff --git a/deps.edn b/deps.edn
-index d3aa811f..5419be40 100644
+index 195de4e..6ebe31b 100644
 --- a/deps.edn
 +++ b/deps.edn
 @@ -1,8 +1,7 @@
@@ -15,4 +12,3 @@ index d3aa811f..5419be40 100644
                                 :deps/manifest :deps}
          com.taoensso/tempura {:mvn/version "1.5.4"}
          day8.re-frame/test {:mvn/version "0.1.7"}
-

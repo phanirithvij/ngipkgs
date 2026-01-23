@@ -15,7 +15,6 @@
   makeDesktopItem,
   makeWrapper,
   replaceVars,
-  nix-update-script,
 
   vulkan-loader,
 }:
@@ -39,6 +38,9 @@ buildNpmPackage (finalAttrs: {
         hash = "sha256-ZOv+9TxBsOnSSbfM7kJLP3cQH9FpgA15aETszg7YSes=";
       };
     })
+    # outputHash of manvenDeps changes each time `clojure` is updated
+    # https://github.com/ngi-nix/ngipkgs/pull/1727#discussion_r2470180998
+    ./pin-clojure.patch
   ];
 
   makeCacheWritable = true;
@@ -102,8 +104,6 @@ buildNpmPackage (finalAttrs: {
 
       dontFixup = true;
 
-      # FIX: this isn't 100% reproducible since it changes each time `clojure` is updated
-      # https://github.com/ngi-nix/ngipkgs/pull/1727#discussion_r2470180998
       outputHash = "sha256-ytS7JiQUC7U0vxuQddxQfDnm0Pt4stkRBfiIlbOpeTk=";
       outputHashMode = "recursive";
       outputHashAlgo = "sha256";
@@ -189,7 +189,7 @@ buildNpmPackage (finalAttrs: {
     })
   ];
 
-  passthru.updateScript = nix-update-script { };
+  passthru.updateScript = ./update.sh;
 
   meta = {
     changelog = "https://github.com/repath-studio/repath-studio/blob/v${finalAttrs.version}/CHANGELOG.md";
