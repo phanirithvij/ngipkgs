@@ -1,7 +1,7 @@
 {
   lib,
   ...
-}:
+}@args:
 [
   (final: prev: {
     scion-apps = prev.scion-apps.overrideAttrs (oldAttrs: {
@@ -37,4 +37,5 @@
     };
     python3Packages = final.python3.pkgs;
   })
+  (import ./overlays/libreoffice-collabora.nix args // { inherit lib; })
 ]
