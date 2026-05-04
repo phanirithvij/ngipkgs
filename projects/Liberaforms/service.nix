@@ -35,8 +35,7 @@ in
     package = mkOption {
       type = types.package;
       default = pkgs.liberaforms;
-      defaultText = literalExpression "<LiberaForms flake>.packages.<system>.default";
-      example = literalExpression "pkgs.liberaforms";
+      defaultText = literalExpression "pkgs.liberaforms";
       description = ''
         LiberaForms package to use.
       '';
