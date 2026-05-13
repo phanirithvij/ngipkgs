@@ -24,7 +24,6 @@ let
           # kmscon allows zooming with [Ctrl] + [+] and [Ctrl] + [-]
           services.kmscon = {
             enable = true;
-            autologinUser = "root";
             fonts = [
               {
                 name = "Hack";
