@@ -252,16 +252,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1771207753,
-        "narHash": "sha256-b9uG8yN50DRQ6A7JdZBfzq718ryYrlmGgqkRm9OOwCE=",
-        "owner": "NixOS",
+        "lastModified": 1778671152,
+        "narHash": "sha256-G12QYWxbtBqsPng5whFVW2Y9vdN9XT3Asg5gVqHuqQM=",
+        "owner": "phanirithvij",
         "repo": "nixpkgs",
-        "rev": "d1c15b7d5806069da59e819999d70e1cec0760bf",
+        "rev": "8c3a8527af1fbe497f2a665c73e7b5caa9859413",
         "type": "github"
       },
       "original": {
-        "owner": "NixOS",
-        "ref": "nixpkgs-unstable",
+        "owner": "phanirithvij",
+        "ref": "liberaforms-init",
         "repo": "nixpkgs",
         "type": "github"
       }
